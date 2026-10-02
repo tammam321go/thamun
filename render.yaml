@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: thamun-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r api/requirements.txt && python -m data.generate && python -m ml.train && python -m ml.evaluate
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false

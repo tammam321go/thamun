@@ -1,0 +1,42 @@
+[
+  {
+    "customer_id": "D0001",
+    "name": "Rina Akter",
+    "persona": "salaried",
+    "language": "en",
+    "income": 45000,
+    "payday": 1,
+    "trusted_contact": "01060431815",
+    "trusted_name": "Sumaiya (family)"
+  },
+  {
+    "customer_id": "D0002",
+    "name": "Tanvir Hasan",
+    "persona": "student",
+    "language": "en",
+    "income": 12000,
+    "payday": 8,
+    "trusted_contact": "01001788577",
+    "trusted_name": "Nipa (family)"
+  },
+  {
+    "customer_id": "D0003",
+    "name": "Karim Uddin",
+    "persona": "shop_owner",
+    "language": "bn",
+    "income": 131000,
+    "payday": 1,
+    "trusted_contact": "01062067985",
+    "trusted_name": "Shirin (family)"
+  },
+  {
+    "customer_id": "D0004",
+    "name": "Salma Begum",
+    "persona": "irregular",
+    "language": "bn",
+    "income": 13000,
+    "payday": 1,
+    "trusted_contact": "01037459710",
+    "trusted_name": "Ruma (family)"
+  }
+]

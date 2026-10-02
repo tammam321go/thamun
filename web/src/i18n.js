@@ -1,0 +1,71 @@
+const STRINGS = {
+  en: {
+    home: 'Home', pay: 'Pay', review: 'Review', goals: 'Goals', ask: 'Ask',
+    balance: 'Balance', today: 'Demo date', protected: 'kept safe after a pause',
+    bills: 'Bills coming up', noBills: 'No regular bills found yet.', ready: 'Ready', tight: 'Tight', short: 'Short',
+    due: 'due', overdue: 'overdue', reminder: 'Cash in at least {amount} by {date} to keep {bill} covered.',
+    cashIn: 'Cash in {amount}', recent: 'Recent activity', spendPerDay: 'Usual spending: about {amount} a day',
+    send_money: 'Send money', cash_out: 'Cash out', merchant_payment: 'Pay a shop', bill_payment: 'Pay a bill', mobile_recharge: 'Recharge',
+    payTo: 'Pay to', saved: 'Saved', newNumber: 'New number', numberHint: '11-digit number', amount: 'Amount', next: 'Continue',
+    usual: 'usually {amount}', pickPayee: 'Choose who to pay.', enterAmount: 'Enter an amount.', badNumber: 'Enter the number using digits only.',
+    purposeTitle: 'What is this payment for?', purposeNote: 'Thamun asks only when the payment is new or it cannot tell.',
+    ownLabel: 'Or add your own label', ownLabelHint: 'e.g. Tuition for Mim',
+    pauseWord: 'থামুন', cancelPay: 'Cancel payment', callFirst: 'Call {name} first', callTip: 'Call them on a number you already know. If you still want to pay afterwards, come back and continue.',
+    readIt: 'I have read the reasons', proceed: 'Pay anyway',
+    confirmTitle: 'Confirm with OTP', otpNote: 'Demo OTP: enter any 4 digits. No real money moves.', payNow: 'Pay {amount}', back: 'Back',
+    balanceAfter: 'Balance after', labelled: 'Labelled as', change: 'Change', yourLabel: 'Your label',
+    paid: 'Paid', cancelled: 'Payment cancelled', stayed: '{amount} stayed in your wallet.', done: 'Done', another: 'Make another payment',
+    insufficient: 'Not enough balance for this payment.',
+    monthOut: 'Spent', monthIn: 'Received', vsLast: 'vs {month}', soFar: 'month so far', byCategory: 'Where it went',
+    changes: 'Biggest changes', up: 'up', down: 'down', pattern: 'About {share}% of your spending leaves in the first 10 days after your main income.',
+    rewards: 'Reward points', simulated: 'simulated', billsOnTime: '{a} of {b} bills paid on time', goalTrack: 'Savings goal on track',
+    guard: 'Guard this session', guardLine: '{pauses} pauses, {cancelled} cancelled, {amount} kept safe', nudgeLine: '{n} spending nudges',
+    goalTitle: 'Savings goal', target: 'Target amount', months: 'Months', makePlan: 'Make a plan', perMonth: 'a month', perWeek: 'a week',
+    realistic: 'Realistic', stretch: 'A stretch', hard: 'Hard on current spending', unknown: 'Not enough history',
+    cuts: 'Where it could come from', lessPerWeek: '{amount} less a week', saveNow: 'Save {amount} now', savedSoFar: 'Saved {a} of {b}',
+    askTitle: 'Ask Thamun', askHint: 'Ask about your spending, bills or savings', askSend: 'Ask', fromNumbers: 'Built from your own numbers',
+    wordedByAi: 'Worded by an AI model from your own numbers', q1: 'Why do I always run short before month-end?', q2: 'Which bills are coming up?', q3: 'Where did my money go last month?', q4: 'How can I reduce cash-outs?',
+    waking: 'Waking the server. A free server sleeps when idle, so the first load can take up to a minute.', failed: 'The server did not answer.', retry: 'Try again',
+    demoBanner: 'Prototype on synthetic data. No real accounts or payments.',
+    otherCats: 'Other categories',
+  },
+  bn: {
+    home: 'হোম', pay: 'পেমেন্ট', review: 'হিসাব', goals: 'লক্ষ্য', ask: 'জিজ্ঞাসা',
+    balance: 'ব্যালেন্স', today: 'ডেমোর তারিখ', protected: 'থামার পর নিরাপদ থেকেছে',
+    bills: 'সামনের বিল', noBills: 'এখনো কোনো নিয়মিত বিল পাওয়া যায়নি।', ready: 'প্রস্তুত', tight: 'টানাটানি', short: 'কম পড়বে',
+    due: 'তারিখ', overdue: 'সময় পেরিয়েছে', reminder: '{bill} বিল দিতে {date} তারিখের মধ্যে অন্তত {amount} ক্যাশ ইন করুন।',
+    cashIn: '{amount} ক্যাশ ইন', recent: 'সাম্প্রতিক লেনদেন', spendPerDay: 'সাধারণ খরচ: দিনে প্রায় {amount}',
+    send_money: 'সেন্ড মানি', cash_out: 'ক্যাশ আউট', merchant_payment: 'দোকানে পেমেন্ট', bill_payment: 'বিল পেমেন্ট', mobile_recharge: 'রিচার্জ',
+    payTo: 'কাকে দেবেন', saved: 'সেভ করা', newNumber: 'নতুন নম্বর', numberHint: '11 সংখ্যার নম্বর', amount: 'পরিমাণ', next: 'এগিয়ে যান',
+    usual: 'সাধারণত {amount}', pickPayee: 'কাকে দেবেন বেছে নিন।', enterAmount: 'পরিমাণ লিখুন।', badNumber: 'নম্বরে শুধু সংখ্যা লিখুন।',
+    purposeTitle: 'এই টাকা কী জন্য পাঠাচ্ছেন?', purposeNote: 'লেনদেন নতুন হলে বা বুঝতে না পারলে তবেই থামুন জিজ্ঞেস করে।',
+    ownLabel: 'অথবা নিজের মতো নাম দিন', ownLabelHint: 'যেমন: মিমের টিউশন ফি',
+    pauseWord: 'থামুন', cancelPay: 'লেনদেন বাতিল করুন', callFirst: 'আগে {name}-কে ফোন করুন', callTip: 'আপনার জানা নম্বরে ফোন করুন। এরপরও টাকা পাঠাতে চাইলে ফিরে এসে এগিয়ে যান।',
+    readIt: 'আমি কারণগুলো পড়েছি', proceed: 'তবুও পাঠান',
+    confirmTitle: 'ওটিপি দিয়ে নিশ্চিত করুন', otpNote: 'ডেমো ওটিপি: যেকোনো 4টি সংখ্যা দিন। আসল টাকা লেনদেন হয় না।', payNow: '{amount} পাঠান', back: 'পেছনে',
+    balanceAfter: 'লেনদেনের পর ব্যালেন্স', labelled: 'খাত', change: 'বদলান', yourLabel: 'আপনার দেওয়া নাম',
+    paid: 'লেনদেন সফল', cancelled: 'লেনদেন বাতিল হয়েছে', stayed: '{amount} আপনার ওয়ালেটেই আছে।', done: 'ঠিক আছে', another: 'আরেকটি লেনদেন',
+    insufficient: 'এই লেনদেনের জন্য ব্যালেন্স যথেষ্ট নয়।',
+    monthOut: 'খরচ', monthIn: 'জমা', vsLast: '{month}-এর তুলনায়', soFar: 'মাসের এ পর্যন্ত', byCategory: 'কোথায় খরচ হয়েছে',
+    changes: 'সবচেয়ে বড় পরিবর্তন', up: 'বেড়েছে', down: 'কমেছে', pattern: 'মূল আয় আসার প্রথম 10 দিনেই আপনার খরচের প্রায় {share}% বেরিয়ে যায়।',
+    rewards: 'রিওয়ার্ড পয়েন্ট', simulated: 'নমুনা', billsOnTime: '{b}টির মধ্যে {a}টি বিল সময়মতো দেওয়া হয়েছে', goalTrack: 'সঞ্চয়ের লক্ষ্য ঠিক পথে আছে',
+    guard: 'এই সেশনে গার্ড', guardLine: '{pauses} বার থেমেছে, {cancelled}টি বাতিল, {amount} নিরাপদ', nudgeLine: 'খরচ নিয়ে {n}টি সতর্কবার্তা',
+    goalTitle: 'সঞ্চয়ের লক্ষ্য', target: 'লক্ষ্যের পরিমাণ', months: 'মাস', makePlan: 'পরিকল্পনা করুন', perMonth: 'প্রতি মাসে', perWeek: 'প্রতি সপ্তাহে',
+    realistic: 'সম্ভব', stretch: 'একটু কষ্টসাধ্য', hard: 'এখনকার খরচে কঠিন', unknown: 'যথেষ্ট তথ্য নেই',
+    cuts: 'কোথা থেকে আসতে পারে', lessPerWeek: 'সপ্তাহে {amount} কম', saveNow: 'এখনই {amount} জমান', savedSoFar: '{b}-এর মধ্যে {a} জমেছে',
+    askTitle: 'থামুনকে জিজ্ঞেস করুন', askHint: 'খরচ, বিল বা সঞ্চয় নিয়ে প্রশ্ন করুন', askSend: 'জিজ্ঞেস করুন', fromNumbers: 'আপনার নিজের হিসাব থেকে তৈরি',
+    wordedByAi: 'আপনার হিসাব থেকে এআই মডেলের লেখা', q1: 'মাসের শেষে টাকা থাকে না কেন?', q2: 'সামনে কোন কোন বিল আছে?', q3: 'গত মাসে টাকা কোথায় খরচ হয়েছে?', q4: 'ক্যাশ আউট কীভাবে কমাব?',
+    waking: 'সার্ভার চালু হচ্ছে। ফ্রি সার্ভার অলস থাকলে ঘুমিয়ে পড়ে, তাই প্রথমবার এক মিনিট পর্যন্ত লাগতে পারে।', failed: 'সার্ভার সাড়া দেয়নি।', retry: 'আবার চেষ্টা করুন',
+    demoBanner: 'নমুনা ডেটার প্রোটোটাইপ। কোনো আসল অ্যাকাউন্ট বা লেনদেন নেই।',
+    otherCats: 'অন্যান্য খাত',
+  },
+}
+
+export function translator(lang) {
+  const table = STRINGS[lang] || STRINGS.en
+  return (key, values = {}) => {
+    let text = table[key] ?? STRINGS.en[key] ?? key
+    for (const [name, value] of Object.entries(values)) text = text.replaceAll(`{${name}}`, value)
+    return text
+  }
+}
