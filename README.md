@@ -37,7 +37,7 @@ false-pause rate, bill shortfalls flagged in advance and customers reaching the 
 |---|---|---|
 | Silent | The payment looks like the customer's normal behaviour | Straight to OTP, no extra step |
 | Nudge (Coach) | Spending in a category is above the customer's usual week, or a bill is at risk | One line that never blocks |
-| Pause (Guard) | Behaviour looks like a scam, the stated purpose is a known scam story, or an unusual payment leaves a bill unpaid | A full screen with the reasons. Cancel, call someone you trust, or pay anyway |
+| Pause (Guard) | Behaviour looks like a scam, the stated purpose is a known scam story, other customers have reported the number, or an unusual payment leaves a bill unpaid | A full screen with the reasons. Cancel, call someone you trust, or pay anyway |
 
 The customer always makes the final decision. Nothing is blocked automatically.
 
@@ -52,6 +52,7 @@ the wallet, balance kept in the wallet and retention.
 | Pre-OTP guard | Scores every payment against the customer's own history: amount, recipient, time, pace, share of balance | LightGBM classifier plus Isolation Forest on per-customer deviation features |
 | Reasons for every pause | Shows the top reasons in plain language | SHAP values (TreeSHAP from LightGBM), filtered so that only statements that are factually true are shown |
 | Purpose check | Asks "what is this for?" only for new or unclear transfers, then checks the answer against data. A "refund" with no matching incoming transfer is a scam signal | Business rules, kept outside the model |
+| Scam number check | A Check tab shows how many customers have reported a number as a scam and what the customer's own history with it is. Any payment to a reported number is paused whatever the amount, and the red page starts with the report count. A number can be reported from the red page or the Check tab | A shared report list and a business rule, kept outside the model |
 | Smart labels | Categorises payments automatically and asks only when unsure. Customers can add their own labels | LightGBM multiclass classifier with a confidence threshold |
 | Spending nudges | A one-line heads-up when a category runs above the customer's own usual week, at most two a week | Robust per-customer baseline (median and spread of recent comparable weeks, festival weeks excluded) |
 | Bill readiness | Finds recurring bills, forecasts the balance to each due date and reminds the customer to cash in three days early | Interval-based recurrence detection and a cash-flow forecast |
@@ -64,6 +65,10 @@ the wallet, balance kept in the wallet and retention.
 The LLM is optional and only words messages. It receives reasons that are already computed, its output is
 rejected if any number changes, and it cannot alter a score or a decision. With no LLM key the app works
 fully on templates.
+
+![A payment to a reported number is paused, and the first reason is the report count](docs/screenshots/reported-pause.png)
+
+![The Check tab shows how many customers reported a number](docs/screenshots/check-number.png)
 
 ### How the blocks fit together
 
@@ -209,9 +214,9 @@ source .venv/bin/activate
 python -m pytest -q
 ```
 
-21 tests cover the purpose rules, the decision logic, bill detection and forecast, the features, the
-nudge baseline, both languages, the LLM guard, input validation, session isolation and the full demo
-story through the API.
+25 tests cover the purpose rules, the decision logic, the reported-number rule and report list, bill
+detection and forecast, the features, the nudge baseline, both languages, the LLM guard, input
+validation, session isolation and the full demo story through the API.
 
 Manual check, as Rina Akter (the default customer). The Demo guide panel in the app runs each step:
 
@@ -221,8 +226,10 @@ Manual check, as Rina Akter (the default customer). The Demo guide panel in the 
 | 2 | Order food, ৳450 | Nudge: "this is your 5th eating out payment this week. Eating out is at ৳2,100, about 37% above your usual week (৳1,538)". Balance ৳9,300 |
 | 3 | Send ৳8,000 to a new number | Thamun asks what it is for. Choose "Returning money sent to me by mistake" |
 | | | Pause with five reasons: about 4× the usual amount, a number never paid before, 86% of the balance, no money ever arrived from that number, and ৳1,200 short for City Electric Supply due on 10 Oct. Cancel it |
-| 4 | Open Home | Bills with ready, tight and short status and a cash-in reminder three days ahead |
-| 5 | Open Review, Goals and Ask | September by category, a plan for ৳30,000 in 6 months (৳5,000 a month), and an answer to "Why do I always run short before month-end?" |
+| 4 | Send ৳50 to 01099004411 (in the Demo guide under "Scam number check") | Pause straight away, with no purpose question. The first reason says 37 people have reported the number. Press "Report this number as a scam" and the count becomes 38 |
+| 5 | Open Check, type 01012345678, check it and report it | "No reports yet", then "Reported as a scam" with 1 report. Switch to another customer and send any amount to that number: it is paused |
+| 6 | Open Home | Bills with ready, tight and short status and a cash-in reminder three days ahead |
+| 7 | Open Review, Goals and Ask | September by category, a plan for ৳30,000 in 6 months (৳5,000 a month), and an answer to "Why do I always run short before month-end?" |
 
 Switch the customer at the top of the phone to try the same payments as a student, a shop owner and an
 irregular earner. Switch the language with the button beside it. "Reset the demo" restores the start.
@@ -236,6 +243,11 @@ The API can be tested directly at `/docs`.
 - **Sessions.** Each browser gets its own copy of the demo customers (header `X-Session`), so several
   judges can use the live app at once without affecting each other. State lives in memory and resets when
   the server restarts.
+- **Reported numbers.** `api/demo_data/reported_numbers.json` is a dummy list of five reported numbers.
+  Reports added in the app are kept per browser session, so one visitor's test reports do not change
+  what another visitor sees, and "Reset the demo" removes them. The four demo customers in one browser
+  share the list, which is how "another customer pays a number I reported" is shown. In a real wallet
+  the list would be one shared store.
 - **Demo data.** `api/demo_data/` is committed. `data/out/` and `ml/models/` are produced by the commands
   in section 5 and are not committed.
 - **OTP.** The OTP screen accepts any 4 digits. No real payment system is connected.
@@ -275,6 +287,12 @@ What these numbers do not show:
   customer one extra tap and never blocks a payment.
 - A scam that uses a known contact's account looks like a normal transfer to a friend. Thamun paused 2 of 4.
 - Per-persona counts are small, so differences between personas are not conclusive.
+- The reported-number rule is not part of the measured results. The test month has no report data, so
+  the figures above come from the behaviour model, the purpose rules and the bill check only.
+- One report is enough to pause a payment in this prototype, and each customer counts once per number.
+  A real service would need protection against false or malicious reports, for example a minimum
+  number of independent reporters, reporter history and manual review. Because a pause never blocks a
+  payment, a false report costs the payer one extra screen.
 
 ## Responsible AI and security
 
@@ -324,6 +342,7 @@ thamun/
 ├── api/
 │   ├── main.py              routes
 │   ├── engine.py            silent, nudge or pause
+│   ├── reports.py           reported scam numbers: dummy list plus reports added in the app
 │   ├── explain.py           Bangla and English templates, optional LLM
 │   ├── schemas.py           request validation
 │   ├── store.py             demo sessions

@@ -120,6 +120,16 @@ random innocent purpose.
 - Merchant, biller and agent names are invented. Person names are common first names with a role, used
   only for the four demo customers.
 
+## Reported scam numbers
+
+- `api/demo_data/reported_numbers.json` is a hand-written dummy list of five numbers with a report count
+  (37, 12, 6, 3 and 1), the most common complaint and the date of the last report. They use the 010
+  prefix like every other generated number and do not appear in any customer's history.
+- The reported-number rule plays no part in training or in the measured results. The simulated
+  transactions contain no report data.
+- Reports made in the app are stored in memory per browser session and count each demo customer once
+  per number. They disappear on "Reset the demo" or when the server restarts.
+
 ## Demo customers
 
 | Customer | Persona | Notes |
