@@ -6,12 +6,13 @@ import DemoGuide from './components/DemoGuide'
 import Icon from './components/Icon'
 import Inspector from './components/Inspector'
 import Ask from './screens/Ask'
+import Check from './screens/Check'
 import Goals from './screens/Goals'
 import Home from './screens/Home'
 import Pay from './screens/Pay'
 import Review from './screens/Review'
 
-const TABS = ['home', 'pay', 'review', 'goals', 'ask']
+const TABS = ['home', 'pay', 'verify', 'review', 'goals', 'ask']
 
 export default function App() {
   const [status, setStatus] = useState('loading')
@@ -25,6 +26,7 @@ export default function App() {
   const [resets, setResets] = useState(0)
   const [preset, setPreset] = useState(null)
   const [lastCheck, setLastCheck] = useState(null)
+  const [lookup, setLookup] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [panel, setPanel] = useState(null)
   const t = useMemo(() => translator(lang), [lang])
@@ -91,6 +93,12 @@ export default function App() {
     setPanel(null)
   }
 
+  const checkNumber = (number) => {
+    setLookup({ number, nonce: Date.now() })
+    setTab('verify')
+    setPanel(null)
+  }
+
   const go = (name) => {
     setTab(name)
     setPanel(null)
@@ -115,6 +123,7 @@ export default function App() {
     <div className="stage">
       <aside className={`side ${panel === 'guide' ? 'open' : ''}`}>
         <DemoGuide customer={customer} customerId={customerId} version={version + resets} onRun={runScenario} onGo={go}
+          onCheckNumber={checkNumber}
           onReset={resetDemo} onClose={() => setPanel(null)} />
       </aside>
 
@@ -136,9 +145,12 @@ export default function App() {
 
           <div className="screen">
             {tab === 'home' && <Home home={home} t={t} lang={lang} customerId={customerId}
-              onPay={(type) => { setPreset({ type, blank: true, nonce: Date.now() }); setTab('pay') }} onChanged={refresh} />}
+              onPay={(type) => { setPreset({ type, blank: true, nonce: Date.now() }); setTab('pay') }} onVerify={() => setTab('verify')}
+              onChanged={refresh} />}
             {tab === 'pay' && <Pay key={`${customerId}-${resets}`} customerId={customerId} lang={lang} t={t} home={home} preset={preset}
               onPresetUsed={() => setPreset(null)} onCheck={setLastCheck} onChanged={refresh} onHome={() => setTab('home')} />}
+            {tab === 'verify' && <Check key={resets} customerId={customerId} lang={lang} t={t} preset={lookup} version={version}
+              onChanged={refresh} />}
             {tab === 'review' && <Review customerId={customerId} lang={lang} t={t} version={version} />}
             {tab === 'goals' && <Goals customerId={customerId} lang={lang} t={t} version={version} onChanged={refresh} />}
             {tab === 'ask' && <Ask key={customerId} customerId={customerId} lang={lang} t={t} />}

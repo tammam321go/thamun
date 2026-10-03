@@ -2,6 +2,7 @@ import { day, percent, taka } from '../format'
 import Icon from './Icon'
 
 const RULES = {
+  reported_number: 'The number is on the reported list. This pauses any amount and skips the purpose question.',
   refund_no_incoming: 'Refund claimed, but nothing was received from this number in the last 72 hours.',
   refund_exceeds_incoming: 'Refund claimed for more than was received.',
   prize_fee: 'Stated purpose is a fee for a prize or offer.',
@@ -120,8 +121,14 @@ export default function Inspector({ check, metrics, onClose }) {
 
               <section>
                 <h3>Rules, kept outside the model</h3>
-                {d.rules.length === 0 && <p className="side-note">No purpose rule fired{d.purpose ? ` for "${d.purpose.replace('_', ' ')}"` : ''}.</p>}
+                {d.rules.length === 0 && <p className="side-note">No rule fired{d.purpose ? ` for "${d.purpose.replace('_', ' ')}"` : ''}.</p>}
                 <ul className="plain">{d.rules.map((r) => <li key={r}>{RULES[r] || r}</li>)}</ul>
+                {d.reported && (
+                  <p className="side-note">
+                    Community reports: {d.reported.reports === 0 ? 'none for this number.'
+                      : `${d.reported.reports} (${d.reported.from_list} from the dummy list, ${d.reported.from_session} added in this browser session).`}
+                  </p>
+                )}
                 {d.affordability ? (
                   <p className="side-note">Bill check: {d.affordability.bill} ({taka(d.affordability.bill_amount)}) is due {day(d.affordability.due_date)}. This payment leaves {taka(d.affordability.shortfall)} too little.</p>
                 ) : <p className="side-note">Bill check: bills due in the next 7 days stay covered.</p>}

@@ -5,7 +5,7 @@ import { clock, day, taka } from '../format'
 
 const TYPES = ['send_money', 'merchant_payment', 'bill_payment', 'cash_out', 'mobile_recharge']
 
-export default function Home({ home, t, lang, customerId, onPay, onChanged }) {
+export default function Home({ home, t, lang, customerId, onPay, onVerify, onChanged }) {
   const [busy, setBusy] = useState(false)
   if (!home) return <div className="pad muted">…</div>
   const { bills } = home
@@ -35,6 +35,14 @@ export default function Home({ home, t, lang, customerId, onPay, onChanged }) {
           </button>
         ))}
       </section>
+
+      <button className="scam-card" onClick={onVerify}>
+        <span className="action-icon"><Icon name="verify" size={20} /></span>
+        <span>
+          <strong>{t('scamCard')}</strong>
+          <small>{t('scamCardSub')}</small>
+        </span>
+      </button>
 
       <section>
         <h2>{t('bills')}</h2>

@@ -11,6 +11,8 @@ const COPY = {
   prize: { title: 'Pay a fee to claim a prize', expect: 'Asks the purpose. Choose "Fee to claim a prize" and Thamun pauses.' },
   takeover: { title: 'Cash out almost everything at an unknown agent', expect: 'Pauses on behaviour alone. This is what an account takeover looks like.' },
   friend: { title: 'Send the usual amount to a regular contact', expect: 'Silent. Known person, normal amount.' },
+  reported_small: { title: 'Send a tiny amount to a reported number', expect: 'Pauses at once, even for ৳50. The red page starts with how many people reported the number.' },
+  reported_usual: { title: 'Send a normal amount to a reported number', expect: 'Pauses without asking the purpose. A reported number pauses any amount.' },
 }
 
 const PERSONA = {
@@ -20,16 +22,29 @@ const PERSONA = {
   irregular: 'Irregular income. Money arrives on unpredictable days and leaves quickly.',
 }
 
-export default function DemoGuide({ customer, customerId, version, onRun, onGo, onReset, onClose }) {
+export default function DemoGuide({ customer, customerId, version, onRun, onGo, onCheckNumber, onReset, onClose }) {
   const [script, setScript] = useState([])
+  const [reported, setReported] = useState([])
 
   useEffect(() => {
     let stopped = false
     api.script(customerId).then((d) => !stopped && setScript(d)).catch(() => {})
+    api.reports().then((d) => !stopped && setReported(d)).catch(() => {})
     return () => {
       stopped = true
     }
   }, [customerId, version])
+
+  const step = (s) => (
+    <li key={s.id}>
+      <div className="step-top">
+        <span className="step-title">{(COPY[s.id] || {}).title}</span>
+        <span className={`pill kind-${s.kind}`}>{s.kind}</span>
+      </div>
+      <p>{(COPY[s.id] || {}).expect}{s.reports ? ` ${s.counterparty} has ${s.reports} reports.` : ''}</p>
+      <button className="btn small" onClick={() => onRun(s)}>Run with {taka(s.amount)}</button>
+    </li>
+  )
 
   return (
     <div className="guide">
@@ -41,17 +56,23 @@ export default function DemoGuide({ customer, customerId, version, onRun, onGo, 
 
       <h3>Try a payment</h3>
       <ol className="steps">
-        {script.map((s) => (
-          <li key={s.id}>
-            <div className="step-top">
-              <span className="step-title">{(COPY[s.id] || {}).title}</span>
-              <span className={`pill kind-${s.kind}`}>{s.kind}</span>
-            </div>
-            <p>{(COPY[s.id] || {}).expect}</p>
-            <button className="btn small" onClick={() => onRun(s)}>Run with {taka(s.amount)}</button>
+        {script.filter((s) => !s.reports).map(step)}
+      </ol>
+
+      <h3>Scam number check</h3>
+      <ol className="steps">
+        {script.filter((s) => s.reports).map(step)}
+      </ol>
+      <p className="side-note">Reported numbers. Type any of them in Pay with any amount, or open one in the Check tab. Reporting a number from the red page or the Check tab adds it here.</p>
+      <ul className="guide-list">
+        {reported.map((r) => (
+          <li key={r.number}>
+            <code>{r.number}</code>
+            <span>{r.reports} {r.reports === 1 ? 'report' : 'reports'}</span>
+            <button className="link" onClick={() => onCheckNumber(r.number)}>Check</button>
           </li>
         ))}
-      </ol>
+      </ul>
 
       <h3>Then look at the coach</h3>
       <ul className="jumps">
