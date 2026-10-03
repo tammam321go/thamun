@@ -8,11 +8,10 @@ Track 03 Financial Independence.
 
 | | |
 |---|---|
-| Live app | `https://YOUR-APP.vercel.app` |
-| Live API | `https://YOUR-API.onrender.com` (interactive docs at `/docs`) |
-| Demo video | `ADD LINK` |
-| Project report | `ADD LINK` |
-| Team | `TEAM NAME, MEMBER NAMES` |
+| Live app | https://thamun.vercel.app |
+| Live API | `https://thamun-demo.onrender.com` (interactive docs at `/docs`) |
+| Demo video | https://drive.google.com/file/d/1c6QW9KjVeQPvivgj_39NzZTq4E2FSBrW/view?usp=sharing |
+| Team | Neural Nexus: Tammam Ibn Aman (232-15-755), Sachin Sarker (232-15-249), Deep Mitra (232-15-211) |
 
 The first request can take up to a minute because the free API server sleeps when idle.
 
@@ -76,7 +75,8 @@ fully on templates.
 ![What happens inside POST /check](docs/diagrams/3-check-decision-flow.png)
 
 More diagrams: [offline pipeline](docs/diagrams/2-offline-pipeline.png) and
-[the scam payment, call by call](docs/diagrams/4-scam-payment-sequence.png).
+[the scam payment, call by call](docs/diagrams/4-scam-payment-sequence.png) and
+[the scam number check](docs/diagrams/5-scam-number-check.png).
 
 ## 3. Technology stack
 
@@ -112,7 +112,7 @@ source ~/.bashrc
 nvm install --lts
 
 # the project
-git clone https://github.com/YOUR-USERNAME/thamun.git
+git clone https://github.com/tammam321go/thamun.git
 cd thamun
 
 # Python environment and libraries
@@ -182,8 +182,8 @@ python -m data.generate --scale 2 # twice as many customers
 
 ## 8. Live deployment URL
 
-- App: `https://YOUR-APP.vercel.app`
-- API: `https://YOUR-API.onrender.com`
+- App: https://thamun.vercel.app
+- API: `https://thamun-demo.onrender.com`
 
 ### Deploying the API on Render
 
@@ -194,7 +194,7 @@ python -m data.generate --scale 2 # twice as many customers
    - Start command: `uvicorn api.main:app --host 0.0.0.0 --port $PORT`
    - Health check path: `/health`
 4. Add the environment variables from section 6. The Python version comes from the `.python-version` file.
-5. Deploy, then open `https://YOUR-API.onrender.com/health`.
+5. Deploy, then open `https://thamun-demo.onrender.com/health`.
 
 `render.yaml` contains the same settings for a one-step Blueprint deploy.
 
