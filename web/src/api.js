@@ -50,6 +50,7 @@ export const api = {
   saveToGoal: (customer_id, amount, lang) => post('/goal/save', { customer_id, amount, lang }),
   ask: (customer_id, question, lang) => post('/ask', { customer_id, question, lang }),
   reports: () => get('/reports'),
+  reportOptions: (lang) => get('/reports/options', { lang }),
   checkNumber: (customer_id, number, lang) => get('/reports/check', { customer_id, number, lang }),
   report: (body) => post('/reports', body),
   reset: (customer_id) => post('/demo/reset', customer_id ? { customer_id } : {}),

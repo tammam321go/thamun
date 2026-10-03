@@ -28,6 +28,8 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
   const [editing, setEditing] = useState(false)
   const [reported, setReported] = useState(false)
   const seen = useRef(null)
+  const amountBox = useRef(null)
+  const [warn, setWarn] = useState(null)
 
   useEffect(() => {
     let stopped = false
@@ -41,6 +43,21 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     const screen = document.querySelector('.screen')
     if (screen) screen.scrollTop = 0
   }, [step])
+
+  useEffect(() => {
+    const typed = number.trim()
+    if (!FREE_ENTRY[type] || typed.replace(/[^A-Za-z0-9]/g, '').length < 11) {
+      setWarn(null)
+      return undefined
+    }
+    let stopped = false
+    api.checkNumber(customerId, typed, lang)
+      .then((data) => !stopped && setWarn(data.reports > 0 ? data.reports : null))
+      .catch(() => !stopped && setWarn(null))
+    return () => {
+      stopped = true
+    }
+  }, [number, type, customerId, lang])
 
   const runCheck = async (pay, purpose, label) => {
     setBusy(true)
@@ -81,11 +98,12 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     setError('')
     setReceipt(null)
     setOwnLabel('')
-    if (preset.blank) {
+    if (preset.blank || preset.prefill) {
       setTarget(null)
-      setNumber('')
+      setNumber(preset.prefill ? preset.counterparty : '')
       setAmount('')
       setStep('form')
+      if (preset.prefill) setTimeout(() => amountBox.current && amountBox.current.focus(), 80)
       return
     }
     const name = preset.fresh ? preset.counterparty : preset.name
@@ -271,7 +289,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     )
   }
 
-  const list = book ? book.payees[type] || [] : []
+  const list = book && !(FREE_ENTRY[type] && number.trim()) ? book.payees[type] || [] : []
 
   return (
     <form className="pad stack" onSubmit={submit}>
@@ -294,6 +312,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
               onChange={(e) => { setNumber(e.target.value); setTarget(null) }} />
           </label>
         )}
+        {FREE_ENTRY[type] && warn && <p className="number-warn" role="status">{warn === 1 ? t('reportedWarnOne') : t('reportedWarn', { n: warn })}</p>}
         {list.length > 0 && <div className="list-label">{t('saved')}</div>}
         {book && list.length === 0 && !FREE_ENTRY[type] && <p className="muted">{t('noPayees')}</p>}
         <ul className="rows pick">
@@ -316,7 +335,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         <span>{t('amount')}</span>
         <div className="money">
           <span>৳</span>
-          <input value={amount} inputMode="decimal" placeholder="0" onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} />
+          <input ref={amountBox} value={amount} inputMode="decimal" placeholder="0" onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} />
         </div>
       </label>
       {home && <p className="footnote">{t('balance')}: {taka(home.balance)}</p>}

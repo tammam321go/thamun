@@ -395,6 +395,11 @@ def reports_list(x_session: str = Header(default="public")):
     return store.reports.listing(store.key(x_session))
 
 
+@app.get("/reports/options")
+def reports_options(lang: str = "en"):
+    return ex.report_options(lang)
+
+
 @app.get("/reports/check")
 def reports_check(customer_id: str, number: str, lang: str = "en", x_session: str = Header(default="public")):
     state = state_for(x_session, customer_id)

@@ -22,7 +22,7 @@ const PERSONA = {
   irregular: 'Irregular income. Money arrives on unpredictable days and leaves quickly.',
 }
 
-export default function DemoGuide({ customer, customerId, version, onRun, onGo, onCheckNumber, onReset, onClose }) {
+export default function DemoGuide({ customer, customerId, version, onRun, onGo, onCheckNumber, onSendTo, onReset, onClose }) {
   const [script, setScript] = useState([])
   const [reported, setReported] = useState([])
 
@@ -63,13 +63,16 @@ export default function DemoGuide({ customer, customerId, version, onRun, onGo, 
       <ol className="steps">
         {script.filter((s) => s.reports).map(step)}
       </ol>
-      <p className="side-note">Reported numbers. Type any of them in Pay with any amount, or open one in the Check tab. Reporting a number from the red page or the Check tab adds it here.</p>
+      <p className="side-note">Reported numbers. Press Send, type any amount and continue: Thamun pauses and shows how many people reported the number. Check opens the number in the Check tab. A number you report from the red page or the Check tab is added to this list.</p>
       <ul className="guide-list">
         {reported.map((r) => (
           <li key={r.number}>
             <code>{r.number}</code>
             <span>{r.reports} {r.reports === 1 ? 'report' : 'reports'}</span>
-            <button className="link" onClick={() => onCheckNumber(r.number)}>Check</button>
+            <span className="guide-actions">
+              <button className="link" onClick={() => onSendTo(r.number)}>Send</button>
+              <button className="link" onClick={() => onCheckNumber(r.number)}>Check</button>
+            </span>
           </li>
         ))}
       </ul>

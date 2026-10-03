@@ -99,6 +99,12 @@ export default function App() {
     setPanel(null)
   }
 
+  const sendTo = (number) => {
+    setPreset({ type: 'send_money', counterparty: number, prefill: true, nonce: Date.now() })
+    setTab('pay')
+    setPanel(null)
+  }
+
   const go = (name) => {
     setTab(name)
     setPanel(null)
@@ -123,7 +129,7 @@ export default function App() {
     <div className="stage">
       <aside className={`side ${panel === 'guide' ? 'open' : ''}`}>
         <DemoGuide customer={customer} customerId={customerId} version={version + resets} onRun={runScenario} onGo={go}
-          onCheckNumber={checkNumber}
+          onCheckNumber={checkNumber} onSendTo={sendTo}
           onReset={resetDemo} onClose={() => setPanel(null)} />
       </aside>
 
@@ -150,7 +156,7 @@ export default function App() {
             {tab === 'pay' && <Pay key={`${customerId}-${resets}`} customerId={customerId} lang={lang} t={t} home={home} preset={preset}
               onPresetUsed={() => setPreset(null)} onCheck={setLastCheck} onChanged={refresh} onHome={() => setTab('home')} />}
             {tab === 'verify' && <Check key={resets} customerId={customerId} lang={lang} t={t} preset={lookup} version={version}
-              onChanged={refresh} />}
+              onChanged={refresh} onSendTo={sendTo} />}
             {tab === 'review' && <Review customerId={customerId} lang={lang} t={t} version={version} />}
             {tab === 'goals' && <Goals customerId={customerId} lang={lang} t={t} version={version} onChanged={refresh} />}
             {tab === 'ask' && <Ask key={customerId} customerId={customerId} lang={lang} t={t} />}

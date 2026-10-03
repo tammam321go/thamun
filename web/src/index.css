@@ -177,6 +177,11 @@ h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
 .verdict-count { font-family: var(--display); font-weight: 800; font-size: 40px; line-height: 1; color: var(--red); }
 .verdict-count small { font-family: var(--body); font-size: 13px; font-weight: 600; color: var(--red-deep); margin-left: 6px; }
 .verdict-advice { font-size: 14px; font-weight: 600; border-top: 1px solid rgba(19, 38, 43, .12); padding-top: 10px; }
+.btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+.report-form { margin-top: 10px; }
+.send-try { align-self: flex-start; }
+.number-warn { display: block; background: var(--red-soft); border-left: 4px solid var(--red); border-radius: 0 10px 10px 0; padding: 8px 11px; font-size: 13.5px; font-weight: 600; color: var(--red-deep); margin-top: 8px; }
+.guide-actions { display: flex; gap: 12px; }
 .report { display: flex; flex-direction: column; gap: 8px; }
 .report-ask { font-size: 14px; font-weight: 600; }
 .report-done { font-size: 14px; font-weight: 600; color: var(--green); }

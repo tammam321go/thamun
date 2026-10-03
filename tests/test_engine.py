@@ -340,6 +340,8 @@ def test_scam_number_check_and_reporting_end_to_end():
     assert check("D0002", fresh, 100, {"X-Session": "pytest-reports-other"})["decision"] == "silent"
     assert fresh in [row["number"] for row in client.get("/reports", headers=headers).json()]
 
+    options = client.get("/reports/options", params={"lang": "bn"}).json()
+    assert [o["code"] for o in options] == list(explain.REPORT_PATTERNS) and options[0]["label"] == explain.REPORT_PATTERNS["refund"][1]
     trusted = store.customers["D0001"]["trusted_contact"]
     assert look(trusted)["verdict"] == "known" and look(trusted, "bn")["headline"] != look(trusted)["headline"]
     assert client.post("/reports", json={"customer_id": "D0001", "number": "B-ELEC"}, headers=headers).status_code == 400
