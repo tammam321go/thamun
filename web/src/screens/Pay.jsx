@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import Icon from '../components/Icon'
+import ReportBox from '../components/ReportBox'
 import { day, taka } from '../format'
 
 const TYPES = ['send_money', 'merchant_payment', 'bill_payment', 'cash_out', 'mobile_recharge']
 const FREE_ENTRY = { send_money: true, cash_out: true }
+const REPORTABLE = { send_money: true, cash_out: true }
 
 export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, onCheck, onChanged, onHome }) {
   const [step, setStep] = useState('form')
@@ -24,6 +26,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
   const [callTip, setCallTip] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const [editing, setEditing] = useState(false)
+  const [reported, setReported] = useState(false)
   const seen = useRef(null)
 
   useEffect(() => {
@@ -33,6 +36,11 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
       stopped = true
     }
   }, [customerId, lang])
+
+  useEffect(() => {
+    const screen = document.querySelector('.screen')
+    if (screen) screen.scrollTop = 0
+  }, [step])
 
   const runCheck = async (pay, purpose, label) => {
     setBusy(true)
@@ -55,6 +63,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         setOtp('')
         setAgree(false)
         setCallTip(false)
+        setReported(Boolean(data.details.reported && data.details.reported.you_reported))
         setStep(data.decision === 'pause' ? 'pause' : 'otp')
       }
     } catch (e) {
@@ -79,9 +88,10 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
       setStep('form')
       return
     }
-    const pay = { type: preset.type, counterparty: preset.counterparty, name: preset.name, amount: preset.amount, merchant_type: preset.merchant_type }
-    setTarget({ counterparty: preset.counterparty, name: preset.name, merchant_type: preset.merchant_type })
-    setNumber(FREE_ENTRY[preset.type] && preset.name === 'New number' ? preset.counterparty : '')
+    const name = preset.fresh ? preset.counterparty : preset.name
+    const pay = { type: preset.type, counterparty: preset.counterparty, name, amount: preset.amount, merchant_type: preset.merchant_type }
+    setTarget({ counterparty: preset.counterparty, name, merchant_type: preset.merchant_type })
+    setNumber(FREE_ENTRY[preset.type] && preset.fresh ? preset.counterparty : '')
     setAmount(String(preset.amount))
     setPayment(pay)
     runCheck(pay)
@@ -131,7 +141,16 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     setError('')
   }
 
+  const text = result ? (result.i18n && result.i18n[lang]) || result : null
+  const labelName = result && result.label ? result.label.custom || (result.label.names && result.label.names[lang]) || result.label.name : ''
+  const categoryName = (code, fallback) => (book && book.categories.find((c) => c.code === code)?.label) || fallback
+  const reportBox = result && REPORTABLE[payment.type] ? (
+    <ReportBox key={result.check_id} customerId={customerId} number={result.counterparty} lang={lang} t={t}
+      options={book ? book.report_options : []} already={reported} onDone={() => { setReported(true); onChanged() }} />
+  ) : null
+
   if (step === 'purpose') {
+    const choices = (book && book.purposes) || options
     return (
       <div className="pad stack">
         <button className="link" onClick={() => setStep('form')}>{t('back')}</button>
@@ -140,7 +159,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
           <p className="muted">{taka(payment.amount)} · {payment.name}</p>
         </div>
         <div className="chips column">
-          {options.map((o) => (
+          {choices.map((o) => (
             <button key={o.code} className="chip wide" disabled={busy} onClick={() => runCheck(payment, o.code, ownLabel.trim())}>{o.label}</button>
           ))}
         </div>
@@ -160,17 +179,18 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     return (
       <div className="pause" role="alertdialog" aria-labelledby="pause-title">
         <div className="pause-word" aria-hidden="true">{t('pauseWord')}</div>
-        <h1 id="pause-title">{result.headline}</h1>
+        <h1 id="pause-title">{text.headline}</h1>
         <p className="pause-sum">{taka(result.amount)} · {result.counterparty_name}</p>
-        {result.explanation_source === 'llm' && <p className="pause-lead">{result.message}</p>}
+        {text.source === 'llm' && <p className="pause-lead">{text.message}</p>}
         <ul className="reasons">
-          {result.reasons.map((r) => <li key={r.code}>{r.text}</li>)}
+          {text.reasons.map((r) => <li key={r.code}>{r.text}</li>)}
         </ul>
-        <p className="pause-advice">{result.advice}</p>
+        <p className="pause-advice">{text.advice}</p>
         <div className="pause-actions">
           <button className="btn light" disabled={busy} onClick={() => finish('cancel')}>{t('cancelPay')}</button>
           <button className="btn ghost" onClick={() => setCallTip(!callTip)}>{t('callFirst', { name: result.trusted_name || '…' })}</button>
           {callTip && <p className="pause-tip">{t('callTip')}</p>}
+          {reportBox}
           <label className="agree">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
             <span>{t('readIt')}</span>
@@ -188,14 +208,14 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         <h1>{t('confirmTitle')}</h1>
         {result.decision === 'nudge' && (
           <div className="nudge" role="status">
-            <strong>{result.headline}</strong>
-            <p>{result.message}</p>
+            <strong>{text.headline}</strong>
+            <p>{text.message}</p>
           </div>
         )}
         <dl className="summary">
           <div><dt>{t('payTo')}</dt><dd>{result.counterparty_name}</dd></div>
           <div><dt>{t('amount')}</dt><dd>{taka(result.amount)}</dd></div>
-          <div><dt>{t('labelled')}</dt><dd><span className="tag">{result.label.custom || result.label.name}</span></dd></div>
+          <div><dt>{t('labelled')}</dt><dd><span className="tag">{labelName}</span></dd></div>
           <div><dt>{t('balanceAfter')}</dt><dd>{taka(result.balance_after)}</dd></div>
         </dl>
         <label className="field">
@@ -220,7 +240,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         <p className="muted">{receipt.txn.name}</p>
         <div className="label-edit">
           <span>{t('labelled')}</span>
-          <span className="tag">{receipt.txn.label || receipt.txn.category_name}</span>
+          <span className="tag">{receipt.txn.label || categoryName(receipt.txn.category, receipt.txn.category_name)}</span>
           <button className="link" onClick={() => setEditing(!editing)}>{t('change')}</button>
         </div>
         {editing && book && (
@@ -244,6 +264,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         <h1>{t('cancelled')}</h1>
         <p>{t('stayed', { amount: taka(result.amount) })}</p>
         <p className="muted">{t('balance')}: {taka(receipt.balance)}</p>
+        {result.decision === 'pause' && reportBox}
         <button className="btn primary" onClick={onHome}>{t('done')}</button>
         <button className="btn" onClick={restart}>{t('another')}</button>
       </div>
@@ -258,7 +279,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         {TYPES.map((name) => (
           <button type="button" key={name} role="tab" aria-selected={type === name} className={type === name ? 'on' : ''}
             onClick={() => { setType(name); setTarget(null); setNumber(''); setError('') }}>
-            <Icon name={name} size={18} />
+            <span className="action-icon"><Icon name={name} size={20} /></span>
             <span>{t(name)}</span>
           </button>
         ))}
@@ -274,6 +295,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
           </label>
         )}
         {list.length > 0 && <div className="list-label">{t('saved')}</div>}
+        {book && list.length === 0 && !FREE_ENTRY[type] && <p className="muted">{t('noPayees')}</p>}
         <ul className="rows pick">
           {list.map((p) => (
             <li key={p.counterparty}>

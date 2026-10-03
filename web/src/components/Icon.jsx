@@ -9,6 +9,8 @@ const PATHS = {
   merchant_payment: 'M4 9h16l-1.5 10h-13L4 9Zm3 0 2-5h6l2 5',
   bill_payment: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6M9 12h6',
   mobile_recharge: 'M8 2h8v20H8V2Zm3 16h2',
+  verify: 'M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3Zm-3 9 2.2 2.2L15.5 10',
+  flag: 'M6 21V4m0 1h11l-2 4 2 4H6',
   close: 'M6 6l12 12M18 6 6 18',
   check: 'M5 12.5 10 17l9-10',
 }
