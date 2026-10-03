@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import re
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +11,9 @@ load_dotenv()
 
 from api import explain as ex
 from api.engine import MODEL_DIR, Engine
-from api.schemas import AskRequest, CheckRequest, GoalRequest, LabelRequest, PayRequest, ResetRequest, SaveRequest
+from api.reports import normalise
+from api.schemas import (AskRequest, CheckRequest, GoalRequest, LabelRequest, PayRequest, ReportRequest, ResetRequest,
+                         SaveRequest)
 from api.store import START_TIME, TYPE_COUNTERPARTY, Store
 from data.personas import CATEGORIES
 from ml import goals, review
@@ -35,6 +39,8 @@ FEATURE_LABELS = {
     "in_cp_ratio": "Money received from this recipient", "in_1h_ratio": "Money received in the last hour",
     "n_out": "Length of payment history", "type_idx": "Payment type", "cp_type_idx": "Recipient type",
 }
+NUMBER_SHAPE = re.compile(r"^[A-Z0-9]{4,24}$")
+NOT_REPORTABLE = {"biller", "operator", "merchant", "employer"}
 store = Store()
 engine = Engine()
 
@@ -48,6 +54,28 @@ def state_for(session, customer_id):
         return store.session(session, customer_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Unknown customer")
+
+
+def explanations(decision, reasons, amount, lang, payment_type):
+    out = {code: ex.explain(decision, reasons, amount, code, payment_type) for code in ex.LANGS}
+    if decision in ("pause", "nudge"):
+        out[lang] = ex.rephrase(out[lang])
+    return out
+
+
+def clean_number(raw):
+    number = normalise(raw)
+    if not NUMBER_SHAPE.match(number):
+        raise HTTPException(status_code=400, detail="Enter the number using digits only.")
+    return number
+
+
+def number_view(state, session, customer_id, number, lang):
+    status = store.reports.status(store.key(session), number, customer_id)
+    known = store.plain.get(number)
+    view = ex.number_check(status, store.dealings(state, number), lang)
+    return dict(status, **view, name=store.lookup(customer_id, number, "send_money")["name"],
+                can_report=not (known and known["type"] in NOT_REPORTABLE), report_options=ex.report_options(lang))
 
 
 def txn_view(txn, lang="en"):
@@ -123,6 +151,7 @@ def home(customer_id: str, lang: str = "en", x_session: str = Header(default="pu
 def payees(customer_id: str, lang: str = "en", x_session: str = Header(default="public")):
     state = state_for(x_session, customer_id)
     return {"payees": store.payees(state), "purposes": ex.purpose_options(lang),
+            "report_options": ex.report_options(lang),
             "categories": [{"code": c, "label": ex.category_name(c, lang)} for c in CATEGORIES],
             "custom_labels": sorted(set(state.labels.values()))}
 
@@ -151,7 +180,8 @@ def check(body: CheckRequest, x_session: str = Header(default="public")):
         "counterparty_type": TYPE_COUNTERPARTY[body.type],
         "merchant_type": body.merchant_type or info["merchant_type"],
     }
-    result = engine.check(state.profile, payment, state.now, body.purpose)
+    report = store.reports.status(store.key(x_session), body.counterparty, body.customer_id)
+    result = engine.check(state.profile, payment, state.now, body.purpose, report)
     decision = result["decision"]
     label = result["label"]
     name = body.counterparty_name or info["name"] or body.counterparty
@@ -163,9 +193,8 @@ def check(body: CheckRequest, x_session: str = Header(default="public")):
             "label": {"category": label["label"], "confidence": round(label["confidence"], 3)},
             "details": {"new_recipient": bool(result["features"]["is_new_cp"]), "label_confident": label["confident"]},
         }
-    explanation = ex.explain(decision, result["reasons"], body.amount, body.lang, body.type)
-    if decision in ("pause", "nudge"):
-        explanation = ex.rephrase(explanation)
+    texts = explanations(decision, result["reasons"], body.amount, body.lang, body.type)
+    explanation = texts[body.lang]
     check_id = state.next_id("K")
     category = result["category"]
     state.pending[check_id] = {
@@ -181,10 +210,14 @@ def check(body: CheckRequest, x_session: str = Header(default="public")):
     return {
         "check_id": check_id, "decision": decision, "headline": explanation["headline"],
         "message": explanation["message"], "reasons": explanation["reasons"], "advice": explanation["advice"],
-        "explanation_source": explanation["source"], "amount": int(body.amount), "counterparty": body.counterparty,
+        "explanation_source": explanation["source"],
+        "i18n": {code: {k: text[k] for k in ("headline", "message", "reasons", "advice", "source")}
+                 for code, text in texts.items()},
+        "amount": int(body.amount), "counterparty": body.counterparty,
         "counterparty_name": name, "balance_before": int(balance), "balance_after": int(balance - body.amount),
         "trusted_name": state.info.get("trusted_name"),
         "label": {"category": category, "name": ex.category_name(category, body.lang),
+                  "names": {code: ex.category_name(category, code) for code in ex.LANGS},
                   "confidence": round(label["confidence"], 3), "auto": body.purpose is None,
                   "custom": body.custom_label,
                   "alternatives": [{"label": a["label"], "confidence": round(a["confidence"], 3)} for a in label["alternatives"]]},
@@ -196,6 +229,7 @@ def check(body: CheckRequest, x_session: str = Header(default="public")):
             "rules": [r["code"] for r in result["reasons"] if r["code"] in ex.SCAM_CODES],
             "affordability": result["affordability"], "nudge": result["nudge"], "flags": result["flags"],
             "purpose": body.purpose,
+            "reported": {k: report[k] for k in ("reports", "pattern", "you_reported", "from_list", "from_session")},
             "features": {"usual_amount": int(round(feats["usual_amount"])), "amount_ratio": round(feats["amt_ratio_type"], 2),
                          "new_recipient": bool(feats["is_new_cp"]), "times_paid_before": int(feats["cp_count"]),
                          "balance_share": round(feats["balance_share"], 2), "payments_last_hour": int(feats["n_1h"]),
@@ -354,6 +388,29 @@ def ask(body: AskRequest, x_session: str = Header(default="public")):
         "bills": bill_plan(state), "goal": goal_view(state),
     }
     return ex.answer(body.question, facts, body.lang)
+
+
+@app.get("/reports")
+def reports_list(x_session: str = Header(default="public")):
+    return store.reports.listing(store.key(x_session))
+
+
+@app.get("/reports/check")
+def reports_check(customer_id: str, number: str, lang: str = "en", x_session: str = Header(default="public")):
+    state = state_for(x_session, customer_id)
+    return number_view(state, x_session, customer_id, clean_number(number), lang)
+
+
+@app.post("/reports")
+def reports_add(body: ReportRequest, x_session: str = Header(default="public")):
+    state = state_for(x_session, body.customer_id)
+    number = clean_number(body.number)
+    known = store.plain.get(number)
+    if known and known["type"] in NOT_REPORTABLE:
+        raise HTTPException(status_code=400, detail="Only personal and agent numbers can be reported.")
+    added = store.reports.add(store.key(x_session), body.customer_id, number, body.pattern, state.now.date())
+    log.info("report customer=%s number=%s pattern=%s added=%s", body.customer_id, number, body.pattern, added)
+    return dict(number_view(state, x_session, body.customer_id, number, body.lang), added=added)
 
 
 @app.get("/decisions")

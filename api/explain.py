@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from datetime import date
 
 import httpx
 
@@ -37,6 +38,33 @@ PURPOSE_NAMES = {
     "prize_fee": ("Fee to claim a prize, cashback or offer", "পুরস্কার, ক্যাশব্যাক বা অফার পেতে ফি দিচ্ছি"),
     "agent_request": ("Someone on the phone asked me to send it", "ফোনে কেউ পাঠাতে বলেছে"),
     "other": ("Something else", "অন্য কিছু"),
+}
+
+REPORT_PATTERNS = {
+    "refund": ("Asked me to return money I never received", "যে টাকা আমি পাইনি তা ফেরত চেয়েছে"),
+    "prize_fee": ("Asked for a fee to claim a prize or offer", "পুরস্কার বা অফারের কথা বলে ফি চেয়েছে"),
+    "fake_agent": ("Pretended to be an agent or officer", "এজেন্ট বা কর্মকর্তা সেজে ফোন করেছে"),
+    "pin_otp": ("Asked for my PIN or OTP", "আমার পিন বা ওটিপি চেয়েছে"),
+    "other": ("Something else", "অন্য কিছু"),
+}
+
+REPORT_DETAILS = {
+    "refund": (
+        "The most common report: the caller asked for a refund of money that was never sent.",
+        "সবচেয়ে বেশি অভিযোগ: যে টাকা পাঠানোই হয়নি তা ফেরত চাওয়া হয়েছে।",
+    ),
+    "prize_fee": (
+        "The most common report: the caller asked for a fee to release a prize or offer.",
+        "সবচেয়ে বেশি অভিযোগ: পুরস্কার বা অফারের কথা বলে ফি চাওয়া হয়েছে।",
+    ),
+    "fake_agent": (
+        "The most common report: the caller pretended to be an agent or officer.",
+        "সবচেয়ে বেশি অভিযোগ: এজেন্ট বা কর্মকর্তা সেজে ফোন করা হয়েছে।",
+    ),
+    "pin_otp": (
+        "The most common report: the caller asked for a PIN or OTP.",
+        "সবচেয়ে বেশি অভিযোগ: পিন বা ওটিপি চাওয়া হয়েছে।",
+    ),
 }
 
 MONTHS_BN = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"]
@@ -89,6 +117,14 @@ TEMPLATES = {
         "This payment does not match your usual pattern.",
         "এই লেনদেনটি আপনার স্বাভাবিক ধরনের সাথে মিলছে না।",
     ),
+    "reported_number": (
+        "{count} people have reported this number as a scam.",
+        "{count} জন গ্রাহক এই নম্বরটিকে প্রতারণার নম্বর হিসেবে রিপোর্ট করেছেন।",
+    ),
+    "reported_number_one": (
+        "1 person has reported this number as a scam.",
+        "1 জন গ্রাহক এই নম্বরটিকে প্রতারণার নম্বর হিসেবে রিপোর্ট করেছেন।",
+    ),
     "refund_no_incoming": (
         "You said you are returning money sent to you by mistake, but no money has arrived from this number.",
         "আপনি বলেছেন ভুল করে আসা টাকা ফেরত দিচ্ছেন, কিন্তু এই নম্বর থেকে আপনার কাছে কোনো টাকা আসেনি।",
@@ -137,7 +173,40 @@ ADVICE = {
     ),
 }
 
-SCAM_CODES = {"refund_no_incoming", "refund_exceeds_incoming", "prize_fee", "agent_request"}
+SCAM_CODES = {"reported_number", "refund_no_incoming", "refund_exceeds_incoming", "prize_fee", "agent_request"}
+
+NUMBER_CHECK = {
+    "reported": ("Reported as a scam", "প্রতারণার নম্বর হিসেবে রিপোর্ট করা হয়েছে"),
+    "known": ("No reports, and you know this number", "কোনো রিপোর্ট নেই, নম্বরটি আপনার পরিচিত"),
+    "unknown": ("No reports yet", "এখনো কোনো রিপোর্ট নেই"),
+    "last_reported": ("Last reported on {date}.", "সর্বশেষ রিপোর্ট: {date}।"),
+    "no_reports": (
+        "No customer has reported this number so far. That does not prove it is safe.",
+        "এখন পর্যন্ত কোনো গ্রাহক এই নম্বরটি রিপোর্ট করেননি। তবে এতে নম্বরটি নিরাপদ প্রমাণিত হয় না।",
+    ),
+    "paid": (
+        "You have paid this number {times} times, ৳{total} in total. The first time was {date}.",
+        "আপনি এই নম্বরে {times} বার টাকা পাঠিয়েছেন, মোট ৳{total}। প্রথমবার পাঠিয়েছেন {date} তারিখে।",
+    ),
+    "paid_once": (
+        "You have paid this number once, ৳{total}, on {date}.",
+        "আপনি এই নম্বরে 1 বার টাকা পাঠিয়েছেন, ৳{total}, {date} তারিখে।",
+    ),
+    "never_paid": ("You have never paid this number.", "এই নম্বরে আপনি আগে কখনো টাকা পাঠাননি।"),
+    "received": ("You have received ৳{total} from this number.", "এই নম্বর থেকে আপনি মোট ৳{total} পেয়েছেন।"),
+    "advice_reported": (
+        "Do not send money to this number, and never share your PIN or OTP. If they are on the phone, hang up.",
+        "এই নম্বরে টাকা পাঠাবেন না, পিন বা ওটিপি কাউকে জানাবেন না। ফোনে থাকলে লাইন কেটে দিন।",
+    ),
+    "advice_unknown": (
+        "If the caller asks for your PIN or OTP, a fee, or a refund, do not pay. Report the number so that others are warned.",
+        "ফোনে কেউ পিন, ওটিপি, ফি বা টাকা ফেরত চাইলে টাকা পাঠাবেন না। নম্বরটি রিপোর্ট করুন, যাতে অন্যরাও সতর্ক হন।",
+    ),
+    "advice_known": (
+        "If a request from this number feels unusual, call the person on a number you already have before you pay.",
+        "এই নম্বর থেকে অস্বাভাবিক অনুরোধ এলে টাকা পাঠানোর আগে আপনার জানা নম্বরে ফোন করে নিশ্চিত হোন।",
+    ),
+}
 
 
 def lang_index(lang):
@@ -168,6 +237,11 @@ def category_name(category, lang):
 
 def render_reason(reason, amount, lang, payment_type="send_money"):
     code = reason["code"]
+    if code == "reported_number":
+        count = int(reason["count"])
+        text = TEMPLATES["reported_number_one" if count == 1 else code][lang_index(lang)].format(count=money(count))
+        detail = REPORT_DETAILS.get(reason.get("pattern"))
+        return f"{text} {detail[lang_index(lang)]}" if detail else text
     if code == "new_recipient":
         code = NEW_RECIPIENT_VARIANT.get(payment_type, code)
     template = TEMPLATES.get(code)
@@ -210,6 +284,38 @@ def explain(decision, reasons, amount, lang="en", payment_type="send_money"):
         "headline": HEADLINES.get(decision, ("", ""))[lang_index(lang)],
         "message": message, "reasons": items, "advice": advice, "source": "template", "language": lang,
     }
+
+
+def number_check(status, history, lang="en"):
+    lang = lang if lang in LANGS else "en"
+    i = lang_index(lang)
+    lines = []
+    if status["reports"]:
+        verdict = "reported"
+        lines.append(render_reason({"code": "reported_number", "count": status["reports"], "pattern": status["pattern"]}, 0, lang))
+        if status["last_reported"]:
+            when = format_date(date.fromisoformat(status["last_reported"]), lang)
+            lines.append(NUMBER_CHECK["last_reported"][i].format(date=when))
+    elif history["times_paid"]:
+        verdict = "known"
+    else:
+        verdict = "unknown"
+        lines.append(NUMBER_CHECK["no_reports"][i])
+    if history["times_paid"]:
+        key = "paid_once" if history["times_paid"] == 1 else "paid"
+        lines.append(NUMBER_CHECK[key][i].format(times=history["times_paid"], total=money(history["total_paid"]),
+                                                 date=format_date(history["first_paid"], lang)))
+    else:
+        lines.append(NUMBER_CHECK["never_paid"][i])
+    if history["total_received"]:
+        lines.append(NUMBER_CHECK["received"][i].format(total=money(history["total_received"])))
+    return {"verdict": verdict, "headline": NUMBER_CHECK[verdict][i], "lines": lines,
+            "advice": NUMBER_CHECK[f"advice_{verdict}"][i], "language": lang}
+
+
+def report_options(lang="en"):
+    i = lang_index(lang)
+    return [{"code": code, "label": names[i]} for code, names in REPORT_PATTERNS.items()]
 
 
 def numbers_in(text):

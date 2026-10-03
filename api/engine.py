@@ -9,6 +9,7 @@ ASK_MIN = 500
 MATERIAL_MIN = 300
 SHORTFALL_MIN = 500
 BILL_NUDGE_DAYS = 3
+REPORT_MIN = 1
 BEHAVIOUR_ORDER = ["amount_vs_usual", "new_recipient", "recent_recipient", "balance_share", "rapid_sequence",
                    "several_new_recipients", "unusual_time"]
 
@@ -37,6 +38,12 @@ def purpose_rules(txn, purpose, feats):
     return []
 
 
+def report_rule(report):
+    if report and report["reports"] >= REPORT_MIN:
+        return [{"code": "reported_number", "count": int(report["reports"]), "pattern": report.get("pattern")}]
+    return []
+
+
 def is_unusual(feats):
     ratio = feats["amt_ratio_type"]
     return bool(ratio >= 3.0 or (feats["is_new_cp"] and ratio >= 1.5))
@@ -57,6 +64,7 @@ def decide(txn, risk, rules, afford, nudge, unusual=False, bill_nudge=True):
         reasons.extend(rules)
         if afford:
             reasons.append(afford)
+        reasons.sort(key=lambda r: r["code"] != "reported_number")
         return "pause", reasons, flags
     reasons = []
     if afford and bill_nudge and afford["days_left"] <= BILL_NUDGE_DAYS:
@@ -71,7 +79,7 @@ class Engine:
         self.categorizer = Categorizer.load(model_dir)
         self.risk = RiskModel.load(model_dir)
 
-    def check(self, profile, payment, now, purpose=None):
+    def check(self, profile, payment, now, purpose=None, report=None):
         txn = {
             "ts": now, "type": payment["type"], "direction": "out", "amount": float(payment["amount"]),
             "counterparty": payment["counterparty"], "counterparty_type": payment["counterparty_type"],
@@ -80,18 +88,20 @@ class Engine:
         feats = profile.state.features(txn)
         label = self.categorizer.predict(feats)
         result = {"txn": txn, "features": feats, "label": label, "purpose": purpose}
-        if purpose is None and needs_purpose(txn, feats, label["confident"]):
+        reported = report_rule(report)
+        if purpose is None and not reported and needs_purpose(txn, feats, label["confident"]):
             return dict(result, decision="ask_purpose", reasons=[], flags={}, risk=None, category=label["label"])
         category = label["label"]
         if purpose in PURPOSES and (not label["confident"] or feats["is_new_cp"] or PURPOSES[purpose]["scam_story"]):
             category = PURPOSES[purpose]["category"]
         risk = self.risk.score(feats)
-        rules = purpose_rules(txn, purpose, feats)
+        rules = reported + purpose_rules(txn, purpose, feats)
         upcoming = profile.bills.upcoming(now.date(), horizon=AFFORD_HORIZON)
         afford = affordability(profile.balance, txn["amount"], upcoming, paying=txn["counterparty"],
                                daily_inflow=profile.bills.daily_inflow(now.date()))
         nudge = profile.spend.check(category, txn["amount"], now)
         bill_nudge = bool(afford) and not profile.spend.bill_seen(afford)
         decision, reasons, flags = decide(txn, risk, rules, afford, nudge, is_unusual(feats), bill_nudge)
+        flags["reported"] = bool(reported)
         return dict(result, decision=decision, reasons=reasons, flags=flags, risk=risk, category=category,
                     affordability=afford, nudge=nudge)

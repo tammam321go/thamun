@@ -3,6 +3,7 @@ from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from api.reports import ReportBook, normalise
 from data.personas import DEMO_TODAY, MERCHANT_CATEGORY
 from ml.bills import median
 from ml.features import load_transactions
@@ -52,18 +53,24 @@ class Store:
                 self.directory[row["counterparty"]] = {
                     "name": row["counterparty_name"], "type": row["counterparty_type"], "merchant_type": row["merchant_type"]}
             self.history[customer_id] = rows
+        self.plain = {normalise(key): value for key, value in self.directory.items()}
         self.sessions = OrderedDict()
+        self.reports = ReportBook(folder / "reported_numbers.json")
+
+    def key(self, session_id):
+        return (session_id or "public")[:64]
 
     def session(self, session_id, customer_id):
         if customer_id not in self.customers:
             raise KeyError(customer_id)
-        key = (session_id or "public")[:64]
+        key = self.key(session_id)
         bucket = self.sessions.get(key)
         if bucket is None:
             bucket = {}
             self.sessions[key] = bucket
             while len(self.sessions) > MAX_SESSIONS:
-                self.sessions.popitem(last=False)
+                old, _ = self.sessions.popitem(last=False)
+                self.reports.clear(old)
         else:
             self.sessions.move_to_end(key)
         if customer_id not in bucket:
@@ -71,15 +78,16 @@ class Store:
         return bucket[customer_id]
 
     def balance(self, session_id, customer_id):
-        bucket = self.sessions.get((session_id or "public")[:64], {})
+        bucket = self.sessions.get(self.key(session_id), {})
         if customer_id in bucket:
             return bucket[customer_id].profile.balance
         return float(self.history[customer_id][-1]["balance_after"])
 
     def reset(self, session_id, customer_id=None):
-        key = (session_id or "public")[:64]
+        key = self.key(session_id)
         if customer_id is None:
             self.sessions.pop(key, None)
+            self.reports.clear(key)
         elif key in self.sessions:
             self.sessions[key].pop(customer_id, None)
 
@@ -90,6 +98,21 @@ class Store:
             "name": name,
             "type": known["type"] if known else TYPE_COUNTERPARTY[payment_type],
             "merchant_type": known["merchant_type"] if known else "none",
+        }
+
+    def dealings(self, state, number):
+        paid, received = [], 0.0
+        for txn in state.profile.txns:
+            if normalise(txn["counterparty"]) != number:
+                continue
+            if txn["direction"] == "out":
+                paid.append(txn)
+            else:
+                received += float(txn["amount"])
+        return {
+            "times_paid": len(paid), "total_paid": int(sum(float(t["amount"]) for t in paid)),
+            "first_paid": paid[0]["ts"].date() if paid else None,
+            "last_paid": paid[-1]["ts"].date() if paid else None, "total_received": int(received),
         }
 
     def payees(self, state):
@@ -136,13 +159,20 @@ class Store:
             items.append({"id": "routine", "kind": "silent", "type": "merchant_payment", "counterparty": shop["counterparty"],
                           "name": shop["name"], "amount": shop["usual_amount"], "merchant_type": shop["merchant_type"]})
         refund = 8000 if state.info["customer_id"] == "D0001" else int(max(500, min(balance * 0.8, usual * 4)) // 100 * 100)
-        items.append({"id": "refund", "kind": "pause", "type": "send_money", "counterparty": "01077001234",
+        items.append({"id": "refund", "kind": "pause", "type": "send_money", "counterparty": "01077001234", "fresh": True,
                       "name": "New number", "amount": refund, "merchant_type": "none", "purpose_hint": "refund_mistake"})
-        items.append({"id": "prize", "kind": "pause", "type": "send_money", "counterparty": "01055009876",
+        items.append({"id": "prize", "kind": "pause", "type": "send_money", "counterparty": "01055009876", "fresh": True,
                       "name": "New number", "amount": int(max(500, min(balance * 0.5, usual * 1.5)) // 50 * 50),
                       "merchant_type": "none", "purpose_hint": "prize_fee"})
-        items.append({"id": "takeover", "kind": "pause", "type": "cash_out", "counterparty": "A9999",
+        items.append({"id": "takeover", "kind": "pause", "type": "cash_out", "counterparty": "A9999", "fresh": True,
                       "name": "Unknown agent point", "amount": int(max(500, balance * 0.9) // 100 * 100), "merchant_type": "none"})
+        listed = sorted(self.reports.seed.values(), key=lambda r: -int(r["reports"]))
+        normal = int(max(300, min(usual, balance * 0.4)) // 50 * 50)
+        for name, row, amount in zip(("reported_small", "reported_usual"), listed, (50, normal)):
+            if amount <= balance:
+                items.append({"id": name, "kind": "pause", "type": "send_money", "counterparty": row["number"], "fresh": True,
+                              "name": "Reported number", "amount": amount, "merchant_type": "none",
+                              "reports": int(row["reports"])})
         if payees["send_money"]:
             friend = payees["send_money"][0]
             items.append({"id": "friend", "kind": "silent", "type": "send_money", "counterparty": friend["counterparty"],

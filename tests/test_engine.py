@@ -253,3 +253,97 @@ def test_bad_input_is_rejected():
     assert negative.status_code == 422
     unknown = client.get("/home", params={"customer_id": "Z9999"})
     assert unknown.status_code == 404
+
+
+def test_reported_number_pauses_any_amount_and_leads_the_reasons():
+    from api.engine import report_rule
+
+    assert report_rule(None) == []
+    assert report_rule({"reports": 0, "pattern": None}) == []
+    rule = report_rule({"reports": 4, "pattern": "prize_fee"})
+    risk = {"high": False, "reasons": [{"code": "new_recipient"}]}
+    decision, reasons, flags = decide({"type": "send_money", "amount": 20}, risk, rule, None, None)
+    assert decision == "pause" and flags["rules"]
+    assert reasons[0] == {"code": "reported_number", "count": 4, "pattern": "prize_fee"}
+
+
+def test_report_book_counts_each_customer_once():
+    from api.reports import ReportBook, normalise
+    from api.store import DEMO_DIR
+
+    book = ReportBook(DEMO_DIR / "reported_numbers.json")
+    today = date(2026, 10, 8)
+    assert normalise("+880 1012-345678") == "01012345678"
+    assert book.status("s1", "01012345678")["reports"] == 0
+    assert book.add("s1", "D0001", "01012345678", "pin_otp", today)
+    assert not book.add("s1", "D0001", "01012345678", "pin_otp", today)
+    assert book.add("s1", "D0002", "+8801012345678", None, today)
+    status = book.status("s1", "01012345678", "D0001")
+    assert status["reports"] == 2 and status["pattern"] == "pin_otp" and status["you_reported"]
+    assert book.status("s2", "01012345678")["reports"] == 0
+    listed = next(iter(book.seed))
+    assert book.status("s2", listed)["reports"] == book.seed[listed]["reports"]
+    book.clear("s1")
+    assert book.status("s1", "01012345678")["reports"] == 0
+
+
+def test_reported_reason_exists_in_both_languages():
+    reason = {"code": "reported_number", "count": 37, "pattern": "prize_fee"}
+    english = explain.explain("pause", [reason], 50, "en")
+    bangla = explain.explain("pause", [reason], 50, "bn")
+    assert "37 people" in english["reasons"][0]["text"] and "37 জন" in bangla["reasons"][0]["text"]
+    assert english["advice"] and bangla["advice"] and english["advice"] != bangla["advice"]
+    assert explain.render_reason({"code": "reported_number", "count": 1, "pattern": None}, 0, "en").startswith("1 person")
+    for names in list(explain.REPORT_PATTERNS.values()) + list(explain.REPORT_DETAILS.values()) + list(explain.NUMBER_CHECK.values()):
+        assert all(names)
+
+
+@pytest.mark.skipif(not trained, reason="models not trained yet")
+def test_scam_number_check_and_reporting_end_to_end():
+    from fastapi.testclient import TestClient
+
+    from api.main import app, store
+
+    client = TestClient(app)
+    headers = {"X-Session": "pytest-reports"}
+    client.post("/demo/reset", json={}, headers=headers)
+    script = {s["id"]: s for s in client.get("/demo/script", params={"customer_id": "D0001"}, headers=headers).json()}
+    known = set(store.directory) | {n for book in store.contacts.values() for n in book}
+    assert not known & set(store.reports.seed)
+
+    def check(customer, number, amount, session=headers, lang="en"):
+        body = {"customer_id": customer, "type": "send_money", "counterparty": number, "amount": amount, "lang": lang}
+        return client.post("/check", json=body, headers=session).json()
+
+    def look(number, lang="en"):
+        return client.get("/reports/check", params={"customer_id": "D0001", "number": number, "lang": lang}, headers=headers).json()
+
+    for name in ("reported_small", "reported_usual"):
+        item = script[name]
+        result = check("D0001", item["counterparty"], item["amount"], lang="bn")
+        assert result["decision"] == "pause" and result["reasons"][0]["code"] == "reported_number"
+        assert result["details"]["reported"]["reports"] == item["reports"]
+        assert result["i18n"]["bn"]["reasons"][0]["text"] == result["reasons"][0]["text"]
+        assert str(item["reports"]) in result["i18n"]["en"]["reasons"][0]["text"]
+        assert result["i18n"]["en"]["headline"] != result["i18n"]["bn"]["headline"]
+    assert script["reported_small"]["amount"] <= 50
+
+    fresh = "01033221100"
+    assert check("D0001", fresh, 100)["decision"] == "silent"
+    assert look(fresh)["verdict"] == "unknown"
+    first = client.post("/reports", json={"customer_id": "D0001", "number": "+880 1033-221100", "pattern": "pin_otp"}, headers=headers).json()
+    assert first["added"] and first["reports"] == 1 and first["verdict"] == "reported" and first["you_reported"]
+    again = client.post("/reports", json={"customer_id": "D0001", "number": fresh, "pattern": "pin_otp"}, headers=headers).json()
+    assert not again["added"] and again["reports"] == 1
+    other = check("D0002", fresh, 100)
+    assert other["decision"] == "pause" and other["reasons"][0]["code"] == "reported_number"
+    assert check("D0002", fresh, 100, {"X-Session": "pytest-reports-other"})["decision"] == "silent"
+    assert fresh in [row["number"] for row in client.get("/reports", headers=headers).json()]
+
+    trusted = store.customers["D0001"]["trusted_contact"]
+    assert look(trusted)["verdict"] == "known" and look(trusted, "bn")["headline"] != look(trusted)["headline"]
+    assert client.post("/reports", json={"customer_id": "D0001", "number": "B-ELEC"}, headers=headers).status_code == 400
+    assert client.get("/reports/check", params={"customer_id": "D0001", "number": "!!"}, headers=headers).status_code == 400
+
+    client.post("/demo/reset", json={}, headers=headers)
+    assert check("D0002", fresh, 100)["decision"] == "silent"

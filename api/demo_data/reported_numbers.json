@@ -1,0 +1,7 @@
+[
+  {"number": "01099004411", "reports": 37, "pattern": "prize_fee", "last_reported": "2026-10-07"},
+  {"number": "01088002277", "reports": 12, "pattern": "fake_agent", "last_reported": "2026-10-06"},
+  {"number": "01066003355", "reports": 6, "pattern": "refund", "last_reported": "2026-10-05"},
+  {"number": "01044007788", "reports": 3, "pattern": "pin_otp", "last_reported": "2026-10-02"},
+  {"number": "01022009966", "reports": 1, "pattern": "other", "last_reported": "2026-09-28"}
+]

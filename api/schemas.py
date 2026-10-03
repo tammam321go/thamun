@@ -2,6 +2,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from api.reports import PATTERNS
 from data.personas import CATEGORIES, MERCHANT_TYPES, OUT_TYPES, PURPOSES
 
 PaymentType = Literal[tuple(OUT_TYPES)]
@@ -9,6 +10,7 @@ PurposeCode = Literal[tuple(PURPOSES)]
 Category = Literal[tuple(CATEGORIES)]
 MerchantType = Literal[tuple(MERCHANT_TYPES)]
 Language = Literal["en", "bn"]
+ReportPattern = Literal[PATTERNS]
 
 
 def clean_label(value):
@@ -76,3 +78,10 @@ class AskRequest(BaseModel):
 
 class ResetRequest(BaseModel):
     customer_id: Optional[str] = Field(default=None, pattern=r"^[A-Z]\d{4}$")
+
+
+class ReportRequest(BaseModel):
+    customer_id: str = Field(pattern=r"^[A-Z]\d{4}$")
+    number: str = Field(min_length=4, max_length=24, pattern=r"^[A-Za-z0-9+\- ]+$")
+    pattern: Optional[ReportPattern] = None
+    lang: Language = "en"
