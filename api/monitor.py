@@ -70,7 +70,7 @@ class Monitor:
         reference = evidence("reference")
         live = len(self.scores)
         out: dict[str, Any] = {"live_checks": live, "minimum_sample": MIN_DRIFT_SAMPLE,
-                               "reference": "validation month, synthetic data" if reference else None}
+                               "reference": reference.get("source") if reference else None}
         if not reference:
             return dict(out, status="no reference file", score_psi=None, high_risk_share=None)
         edges = reference["score_edges"]

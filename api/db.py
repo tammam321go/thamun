@@ -80,19 +80,36 @@ def database_url() -> str:
 
 class Database:
     def __init__(self, url: Optional[str] = None) -> None:
+        self.fallback = False
         raw = url or database_url()
+        try:
+            self.engine = self.connect(raw)
+        except Exception as error:
+            if raw.startswith("sqlite"):
+                raise
+            log.error("could not reach the configured database (%s). Falling back to a local SQLite file.",
+                      type(error).__name__)
+            self.fallback = True
+            path = Path(os.getenv("THAMUN_DB_PATH") or ROOT / "data" / "thamun.db")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.engine = self.connect(f"sqlite:///{path}")
+        self.backend = "postgresql" if self.engine.dialect.name == "postgresql" else "sqlite"
+        log.info("database ready backend=%s", self.backend)
+
+    @staticmethod
+    def connect(raw: str) -> Engine:
         args: dict[str, Any] = {}
         if raw.startswith("sqlite"):
             args["check_same_thread"] = False
         elif "pg8000" in raw:
             wants_ssl = "sslmode=require" in raw or os.getenv("DATABASE_SSL", "").lower() == "true"
             raw = raw.split("?")[0]
+            args["timeout"] = 10
             if wants_ssl:
                 args["ssl_context"] = ssl.create_default_context()
-        self.engine: Engine = create_engine(raw, connect_args=args, pool_pre_ping=True)
-        self.backend = "postgresql" if raw.startswith("postgresql") else "sqlite"
-        metadata.create_all(self.engine)
-        log.info("database ready backend=%s", self.backend)
+        engine = create_engine(raw, connect_args=args, pool_pre_ping=True)
+        metadata.create_all(engine)
+        return engine
 
     def healthy(self) -> bool:
         try:

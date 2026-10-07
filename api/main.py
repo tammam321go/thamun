@@ -120,7 +120,9 @@ def reporter_of(who: Principal, customer_id: str) -> str:
 def load_metrics() -> Optional[dict]:
     path = MODEL_DIR / "metrics.json"
     if path.exists():
-        return json.loads(path.read_text())
+        local = json.loads(path.read_text())
+        if "friction" in local:
+            return local
     return evidence("metrics")
 
 
@@ -264,6 +266,7 @@ def root():
 def health():
     return {"status": "ok", "version": API_VERSION, "demo_date": START_TIME.date(), "trained_at": META["trained_at"],
             "llm": bool(ex.llm_settings()), "database": db.backend, "database_ok": db.healthy(),
+            "database_fallback": db.fallback,
             "auth_required": auth_required()}
 
 
@@ -311,6 +314,12 @@ def payees(customer_id: str, lang: str = "en", who: Principal = Depends(principa
             "custom_labels": sorted(set(state.labels.values()))}
 
 
+def pause_kind(decision: str, flags: dict) -> Optional[str]:
+    if decision != "pause":
+        return None
+    return "scam" if flags.get("behaviour") or flags.get("rules") else "bill"
+
+
 def dry_run(state, who: Principal, customer_id: str, item: dict) -> dict:
     if item["amount"] > state.profile.balance:
         return {"expected": "insufficient", "asks_purpose": False}
@@ -321,15 +330,43 @@ def dry_run(state, who: Principal, customer_id: str, item: dict) -> dict:
     report = store.reports.status(who.key, item["counterparty"], reporter_of(who, customer_id), state.now.date())
     first = engine.check(state.profile, payment, state.now, None, report)
     if first["decision"] != "ask_purpose":
-        return {"expected": first["decision"], "asks_purpose": False}
+        return {"expected": first["decision"], "asks_purpose": False,
+                "pause_kind": pause_kind(first["decision"], first["flags"])}
     final = engine.check(state.profile, payment, state.now, item.get("purpose_hint") or "friend", report)
-    return {"expected": final["decision"], "asks_purpose": True}
+    return {"expected": final["decision"], "asks_purpose": True, "pause_kind": pause_kind(final["decision"], final["flags"])}
+
+
+def bill_risk_amount(state, who: Principal, customer_id: str, item: dict) -> Optional[int]:
+    low, high = 4, int(state.profile.balance) // 500
+    if high < low:
+        return None
+
+    def outcome(steps: int) -> dict:
+        return dry_run(state, who, customer_id, dict(item, amount=steps * 500))
+
+    if outcome(high)["expected"] != "pause":
+        return None
+    while low < high:
+        middle = (low + high) // 2
+        if outcome(middle)["expected"] == "pause":
+            high = middle
+        else:
+            low = middle + 1
+    return low * 500 if outcome(low)["pause_kind"] == "bill" else None
 
 
 @app.get("/demo/script")
 def demo_script(customer_id: str, who: Principal = Depends(principal)):
     state = state_for(who, customer_id)
-    return [dict(item, **dry_run(state, who, customer_id, item)) for item in store.scenarios(state, who.key)]
+    out = []
+    for item in store.scenarios(state, who.key):
+        if item.pop("search", False):
+            amount = bill_risk_amount(state, who, customer_id, item)
+            if amount is None:
+                continue
+            item["amount"] = amount
+        out.append(dict(item, **dry_run(state, who, customer_id, item)))
+    return out
 
 
 @app.post("/demo/reset")
@@ -388,7 +425,9 @@ def check(body: CheckRequest, background: BackgroundTasks, who: Principal = Depe
     background.add_task(db.audit, "check", who.key, body.customer_id, payment_type=body.type, amount=int(body.amount),
                         decision=decision, risk=round(risk["probability"], 4), reasons=",".join(codes))
     return {
-        "check_id": check_id, "decision": decision, "risk_level": RISK_LEVELS[decision],
+        "check_id": check_id, "decision": decision,
+        "risk_level": "medium" if pause_kind(decision, result["flags"]) == "bill" else RISK_LEVELS[decision],
+        "pause_kind": pause_kind(decision, result["flags"]),
         "headline": explanation["headline"],
         "message": explanation["message"], "reasons": explanation["reasons"], "advice": explanation["advice"],
         "explanation_source": explanation["source"],
@@ -674,6 +713,6 @@ def monitoring():
         monitor.snapshot(), version=API_VERSION,
         model={"trained_at": META["trained_at"], "versions": META["versions"], "risk_threshold": round(engine.risk.threshold, 4),
                "anomaly_threshold": round(engine.risk.iso_threshold, 3), "label_threshold": engine.categorizer.threshold},
-        database={"backend": db.backend, "ok": db.healthy(), "reports": store.reports.total()},
+        database={"backend": db.backend, "ok": db.healthy(), "fallback": db.fallback, "reports": store.reports.total()},
         security={"auth_required": auth_required(), "rate_limit_per_minute": rate_limit(), "cors_origins": origins},
         llm=ex.llm_status(), sessions_in_memory=len(store.sessions))

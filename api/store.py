@@ -1,4 +1,5 @@
 import json
+import os
 from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -13,8 +14,11 @@ from ml.profile import CustomerProfile
 DEMO_DIR = Path(__file__).resolve().parent / "demo_data"
 START_TIME = datetime(DEMO_TODAY.year, DEMO_TODAY.month, DEMO_TODAY.day, 13, 10)
 STEP = timedelta(minutes=37)
-MAX_SESSIONS = 120
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "120"))
 DEMO_NUMBERS = ("01077001234", "01055009876", "A9999")
+STUDY = {"bill": "normal", "routine": "normal", "friend": "normal", "food": "overspending", "refund": "new_recipient",
+         "prize": "new_recipient", "takeover": "unusual", "reported_small": "reported", "reported_usual": "reported",
+         "reported_once": "reported", "bill_risk": "bill_risk"}
 
 TYPE_COUNTERPARTY = {"send_money": "person", "cash_out": "agent", "merchant_payment": "merchant",
                      "bill_payment": "biller", "mobile_recharge": "operator"}
@@ -190,4 +194,9 @@ class Store:
             friend = payees["send_money"][0]
             items.append({"id": "friend", "kind": "silent", "type": "send_money", "counterparty": friend["counterparty"],
                           "name": friend["name"], "amount": friend["usual_amount"], "merchant_type": "none"})
+            if bill:
+                items.append({"id": "bill_risk", "kind": "pause", "type": "send_money", "counterparty": friend["counterparty"],
+                              "name": friend["name"], "amount": 0, "merchant_type": "none", "search": True})
+        for item in items:
+            item["study"] = STUDY.get(item["id"], "free")
         return items
