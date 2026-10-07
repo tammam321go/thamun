@@ -1,0 +1,389 @@
+{
+  "generated_at": "2026-10-07T10:14:14",
+  "tool": "Locust",
+  "environment": "Measured on one machine with 2 CPU cores (Linux), API and load generator on the same machine, 1 API worker, SQLite. Rate limits were raised for this run because every simulated user comes from one address. Sessions kept in memory: 400.",
+  "scenario": "Each simulated user opens a session, then repeats: risk check and cancel (60%), home (20%), number check (10%), health (10%), with 0.5 to 1.5 seconds between actions.",
+  "headline": "Largest stage with under 1% failures and a 95th percentile risk check under 500 ms.",
+  "users": 50,
+  "duration_seconds": 40,
+  "requests": 3005,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "requests_per_second": 77.0,
+  "check": {
+    "requests": 1293,
+    "failures": 0,
+    "p50_ms": 41,
+    "p95_ms": 300,
+    "p99_ms": 480,
+    "average_ms": 74.6,
+    "max_ms": 871
+  },
+  "stages": [
+    {
+      "users": 25,
+      "duration_seconds": 40,
+      "requests": 1593,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "requests_per_second": 40.8,
+      "all": {
+        "requests": 1593,
+        "failures": 0,
+        "p50_ms": 8,
+        "p95_ms": 50,
+        "p99_ms": 130,
+        "average_ms": 18.5,
+        "max_ms": 1007
+      },
+      "check": {
+        "requests": 654,
+        "failures": 0,
+        "p50_ms": 18,
+        "p95_ms": 63,
+        "p99_ms": 190,
+        "average_ms": 25.7,
+        "max_ms": 236
+      },
+      "by_route": {
+        "/auth/session": {
+          "requests": 25,
+          "failures": 0,
+          "p50_ms": 39,
+          "p95_ms": 65,
+          "p99_ms": 110,
+          "average_ms": 40.3,
+          "max_ms": 109
+        },
+        "/check": {
+          "requests": 654,
+          "failures": 0,
+          "p50_ms": 18,
+          "p95_ms": 63,
+          "p99_ms": 190,
+          "average_ms": 25.7,
+          "max_ms": 236
+        },
+        "/demo/script": {
+          "requests": 5,
+          "failures": 0,
+          "p50_ms": 810,
+          "p95_ms": 1000,
+          "p99_ms": 1000,
+          "average_ms": 785.7,
+          "max_ms": 1007
+        },
+        "/health": {
+          "requests": 85,
+          "failures": 0,
+          "p50_ms": 4,
+          "p95_ms": 24,
+          "p99_ms": 110,
+          "average_ms": 9.8,
+          "max_ms": 112
+        },
+        "/home": {
+          "requests": 192,
+          "failures": 0,
+          "p50_ms": 5,
+          "p95_ms": 25,
+          "p99_ms": 62,
+          "average_ms": 9.0,
+          "max_ms": 79
+        },
+        "/pay": {
+          "requests": 515,
+          "failures": 0,
+          "p50_ms": 4,
+          "p95_ms": 25,
+          "p99_ms": 50,
+          "average_ms": 7.3,
+          "max_ms": 79
+        },
+        "/reports/check": {
+          "requests": 117,
+          "failures": 0,
+          "p50_ms": 7,
+          "p95_ms": 35,
+          "p99_ms": 80,
+          "average_ms": 12.3,
+          "max_ms": 113
+        }
+      }
+    },
+    {
+      "users": 50,
+      "duration_seconds": 40,
+      "requests": 3005,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "requests_per_second": 77.0,
+      "all": {
+        "requests": 3005,
+        "failures": 0,
+        "p50_ms": 22,
+        "p95_ms": 270,
+        "p99_ms": 870,
+        "average_ms": 76.0,
+        "max_ms": 4878
+      },
+      "check": {
+        "requests": 1293,
+        "failures": 0,
+        "p50_ms": 41,
+        "p95_ms": 300,
+        "p99_ms": 480,
+        "average_ms": 74.6,
+        "max_ms": 871
+      },
+      "by_route": {
+        "/auth/session": {
+          "requests": 50,
+          "failures": 0,
+          "p50_ms": 480,
+          "p95_ms": 2000,
+          "p99_ms": 4500,
+          "average_ms": 674.3,
+          "max_ms": 4496
+        },
+        "/check": {
+          "requests": 1293,
+          "failures": 0,
+          "p50_ms": 41,
+          "p95_ms": 300,
+          "p99_ms": 480,
+          "average_ms": 74.6,
+          "max_ms": 871
+        },
+        "/demo/script": {
+          "requests": 23,
+          "failures": 0,
+          "p50_ms": 2400,
+          "p95_ms": 4700,
+          "p99_ms": 4900,
+          "average_ms": 2505.3,
+          "max_ms": 4878
+        },
+        "/health": {
+          "requests": 151,
+          "failures": 0,
+          "p50_ms": 13,
+          "p95_ms": 110,
+          "p99_ms": 270,
+          "average_ms": 26.6,
+          "max_ms": 280
+        },
+        "/home": {
+          "requests": 306,
+          "failures": 0,
+          "p50_ms": 15,
+          "p95_ms": 73,
+          "p99_ms": 120,
+          "average_ms": 23.0,
+          "max_ms": 197
+        },
+        "/pay": {
+          "requests": 1031,
+          "failures": 0,
+          "p50_ms": 9,
+          "p95_ms": 80,
+          "p99_ms": 170,
+          "average_ms": 21.9,
+          "max_ms": 415
+        },
+        "/reports/check": {
+          "requests": 151,
+          "failures": 0,
+          "p50_ms": 14,
+          "p95_ms": 330,
+          "p99_ms": 410,
+          "average_ms": 46.1,
+          "max_ms": 571
+        }
+      }
+    },
+    {
+      "users": 100,
+      "duration_seconds": 40,
+      "requests": 3180,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "requests_per_second": 81.6,
+      "all": {
+        "requests": 3180,
+        "failures": 0,
+        "p50_ms": 450,
+        "p95_ms": 1700,
+        "p99_ms": 3100,
+        "average_ms": 613.7,
+        "max_ms": 8402
+      },
+      "check": {
+        "requests": 1289,
+        "failures": 0,
+        "p50_ms": 570,
+        "p95_ms": 1700,
+        "p99_ms": 2300,
+        "average_ms": 686.3,
+        "max_ms": 3070
+      },
+      "by_route": {
+        "/auth/session": {
+          "requests": 100,
+          "failures": 0,
+          "p50_ms": 930,
+          "p95_ms": 3300,
+          "p99_ms": 3700,
+          "average_ms": 1064.0,
+          "max_ms": 3659
+        },
+        "/check": {
+          "requests": 1289,
+          "failures": 0,
+          "p50_ms": 570,
+          "p95_ms": 1700,
+          "p99_ms": 2300,
+          "average_ms": 686.3,
+          "max_ms": 3070
+        },
+        "/demo/script": {
+          "requests": 38,
+          "failures": 0,
+          "p50_ms": 5000,
+          "p95_ms": 7600,
+          "p99_ms": 8400,
+          "average_ms": 4817.4,
+          "max_ms": 8402
+        },
+        "/health": {
+          "requests": 194,
+          "failures": 0,
+          "p50_ms": 320,
+          "p95_ms": 780,
+          "p99_ms": 1200,
+          "average_ms": 362.2,
+          "max_ms": 1328
+        },
+        "/home": {
+          "requests": 343,
+          "failures": 0,
+          "p50_ms": 330,
+          "p95_ms": 1400,
+          "p99_ms": 2000,
+          "average_ms": 432.5,
+          "max_ms": 1998
+        },
+        "/pay": {
+          "requests": 1032,
+          "failures": 0,
+          "p50_ms": 350,
+          "p95_ms": 1300,
+          "p99_ms": 1900,
+          "average_ms": 431.5,
+          "max_ms": 2139
+        },
+        "/reports/check": {
+          "requests": 184,
+          "failures": 0,
+          "p50_ms": 510,
+          "p95_ms": 1700,
+          "p99_ms": 2400,
+          "average_ms": 617.7,
+          "max_ms": 2397
+        }
+      }
+    },
+    {
+      "users": 200,
+      "duration_seconds": 40,
+      "requests": 2149,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "requests_per_second": 53.7,
+      "all": {
+        "requests": 2149,
+        "failures": 0,
+        "p50_ms": 1600,
+        "p95_ms": 11000,
+        "p99_ms": 16000,
+        "average_ms": 3022.6,
+        "max_ms": 18436
+      },
+      "check": {
+        "requests": 832,
+        "failures": 0,
+        "p50_ms": 1600,
+        "p95_ms": 11000,
+        "p99_ms": 12000,
+        "average_ms": 3082.7,
+        "max_ms": 13031
+      },
+      "by_route": {
+        "/auth/session": {
+          "requests": 200,
+          "failures": 0,
+          "p50_ms": 3900,
+          "p95_ms": 5500,
+          "p99_ms": 6500,
+          "average_ms": 3238.1,
+          "max_ms": 7729
+        },
+        "/check": {
+          "requests": 832,
+          "failures": 0,
+          "p50_ms": 1600,
+          "p95_ms": 11000,
+          "p99_ms": 12000,
+          "average_ms": 3082.7,
+          "max_ms": 13031
+        },
+        "/demo/script": {
+          "requests": 86,
+          "failures": 0,
+          "p50_ms": 11000,
+          "p95_ms": 18000,
+          "p99_ms": 18000,
+          "average_ms": 11433.4,
+          "max_ms": 18436
+        },
+        "/health": {
+          "requests": 104,
+          "failures": 0,
+          "p50_ms": 920,
+          "p95_ms": 4400,
+          "p99_ms": 9500,
+          "average_ms": 1524.7,
+          "max_ms": 10065
+        },
+        "/home": {
+          "requests": 220,
+          "failures": 0,
+          "p50_ms": 1400,
+          "p95_ms": 11000,
+          "p99_ms": 12000,
+          "average_ms": 2804.3,
+          "max_ms": 11932
+        },
+        "/pay": {
+          "requests": 604,
+          "failures": 0,
+          "p50_ms": 1400,
+          "p95_ms": 6300,
+          "p99_ms": 9900,
+          "average_ms": 1956.6,
+          "max_ms": 11792
+        },
+        "/reports/check": {
+          "requests": 103,
+          "failures": 0,
+          "p50_ms": 1600,
+          "p95_ms": 11000,
+          "p99_ms": 12000,
+          "average_ms": 3326.0,
+          "max_ms": 12250
+        }
+      }
+    }
+  ],
+  "rate_limit_observation": "In a first run with the default limits, the limiter rejected 3,315 requests from the single load-generator address with status 429, which is the intended behaviour."
+}
