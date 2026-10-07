@@ -9,7 +9,6 @@ ASK_MIN = 500
 MATERIAL_MIN = 300
 SHORTFALL_MIN = 500
 BILL_NUDGE_DAYS = 3
-REPORT_MIN = 1
 BEHAVIOUR_ORDER = ["amount_vs_usual", "new_recipient", "recent_recipient", "balance_share", "rapid_sequence",
                    "several_new_recipients", "unusual_time"]
 
@@ -39,8 +38,15 @@ def purpose_rules(txn, purpose, feats):
 
 
 def report_rule(report):
-    if report and report["reports"] >= REPORT_MIN:
-        return [{"code": "reported_number", "count": int(report["reports"]), "pattern": report.get("pattern")}]
+    if report and report.get("confidence") in ("medium", "high"):
+        return [{"code": "reported_number", "count": int(report["reports"]), "pattern": report.get("pattern"),
+                 "confidence": report["confidence"], "recent": int(report.get("recent_reports", 0))}]
+    return []
+
+
+def report_note(report):
+    if report and report.get("confidence") == "low":
+        return [{"code": "reported_unconfirmed", "count": int(report["reports"])}]
     return []
 
 
@@ -49,7 +55,7 @@ def is_unusual(feats):
     return bool(ratio >= 3.0 or (feats["is_new_cp"] and ratio >= 1.5))
 
 
-def decide(txn, risk, rules, afford, nudge, unusual=False, bill_nudge=True):
+def decide(txn, risk, rules, afford, nudge, unusual=False, bill_nudge=True, notes=()):
     behaviour = bool(risk["high"]) and txn["amount"] >= MATERIAL_MIN
     shortfall = bool(afford and afford["caused"] and unusual and afford["days_left"] <= BILL_NUDGE_DAYS
                      and txn["type"] != "bill_payment" and txn["amount"] >= SHORTFALL_MIN)
@@ -62,11 +68,12 @@ def decide(txn, risk, rules, afford, nudge, unusual=False, bill_nudge=True):
             if behaviour and not reasons:
                 reasons.append({"code": "unusual_pattern"})
         reasons.extend(rules)
+        reasons.extend(notes)
         if afford:
             reasons.append(afford)
         reasons.sort(key=lambda r: r["code"] != "reported_number")
         return "pause", reasons, flags
-    reasons = []
+    reasons = list(notes)
     if afford and bill_nudge and afford["days_left"] <= BILL_NUDGE_DAYS:
         reasons.append(dict(afford, code="bill_due_soon"))
     if nudge:
@@ -89,6 +96,7 @@ class Engine:
         label = self.categorizer.predict(feats)
         result = {"txn": txn, "features": feats, "label": label, "purpose": purpose}
         reported = report_rule(report)
+        notes = report_note(report)
         if purpose is None and not reported and needs_purpose(txn, feats, label["confident"]):
             return dict(result, decision="ask_purpose", reasons=[], flags={}, risk=None, category=label["label"])
         category = label["label"]
@@ -101,7 +109,8 @@ class Engine:
                                daily_inflow=profile.bills.daily_inflow(now.date()))
         nudge = profile.spend.check(category, txn["amount"], now)
         bill_nudge = bool(afford) and not profile.spend.bill_seen(afford)
-        decision, reasons, flags = decide(txn, risk, rules, afford, nudge, is_unusual(feats), bill_nudge)
+        decision, reasons, flags = decide(txn, risk, rules, afford, nudge, is_unusual(feats), bill_nudge, notes)
         flags["reported"] = bool(reported)
+        flags["reported_unconfirmed"] = bool(notes)
         return dict(result, decision=decision, reasons=reasons, flags=flags, risk=risk, category=category,
                     affordability=afford, nudge=nudge)

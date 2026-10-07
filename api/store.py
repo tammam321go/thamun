@@ -3,6 +3,7 @@ from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from api.db import Database
 from api.reports import ReportBook, normalise
 from data.personas import DEMO_TODAY, MERCHANT_CATEGORY
 from ml.bills import median
@@ -13,6 +14,7 @@ DEMO_DIR = Path(__file__).resolve().parent / "demo_data"
 START_TIME = datetime(DEMO_TODAY.year, DEMO_TODAY.month, DEMO_TODAY.day, 13, 10)
 STEP = timedelta(minutes=37)
 MAX_SESSIONS = 120
+DEMO_NUMBERS = ("01077001234", "01055009876", "A9999")
 
 TYPE_COUNTERPARTY = {"send_money": "person", "cash_out": "agent", "merchant_payment": "merchant",
                      "bill_payment": "biller", "mobile_recharge": "operator"}
@@ -39,8 +41,9 @@ class CustomerSession:
 
 
 class Store:
-    def __init__(self, folder=DEMO_DIR):
+    def __init__(self, folder=DEMO_DIR, db=None):
         folder = Path(folder)
+        self.db = db or Database()
         self.customers = {c["customer_id"]: c for c in json.loads((folder / "customers.json").read_text())}
         self.contacts = json.loads((folder / "contacts.json").read_text())
         frame = load_transactions(folder / "transactions.csv")
@@ -55,7 +58,9 @@ class Store:
             self.history[customer_id] = rows
         self.plain = {normalise(key): value for key, value in self.directory.items()}
         self.sessions = OrderedDict()
-        self.reports = ReportBook(folder / "reported_numbers.json")
+        self.reports = ReportBook(self.db, folder / "reported_numbers.json")
+        self.reports.protected = (set(self.plain) | {normalise(n) for book in self.contacts.values() for n in book}
+                                  | {normalise(n) for n in DEMO_NUMBERS})
 
     def key(self, session_id):
         return (session_id or "public")[:64]
@@ -69,8 +74,7 @@ class Store:
             bucket = {}
             self.sessions[key] = bucket
             while len(self.sessions) > MAX_SESSIONS:
-                old, _ = self.sessions.popitem(last=False)
-                self.reports.clear(old)
+                self.sessions.popitem(last=False)
         else:
             self.sessions.move_to_end(key)
         if customer_id not in bucket:
@@ -83,11 +87,12 @@ class Store:
             return bucket[customer_id].profile.balance
         return float(self.history[customer_id][-1]["balance_after"])
 
-    def reset(self, session_id, customer_id=None):
+    def reset(self, session_id, customer_id=None, report_key=None):
         key = self.key(session_id)
         if customer_id is None:
             self.sessions.pop(key, None)
-            self.reports.clear(key)
+            if report_key:
+                self.reports.clear(report_key)
         elif key in self.sessions:
             self.sessions[key].pop(customer_id, None)
 
@@ -138,7 +143,7 @@ class Store:
             for b in state.profile.bills.upcoming(today) if b["type"] == "bill_payment"]
         return out
 
-    def scenarios(self, state):
+    def scenarios(self, state, session=""):
         payees = self.payees(state)
         balance = state.profile.balance
         sends = sorted(float(t["amount"]) for t in state.profile.txns if t["direction"] == "out" and t["type"] == "send_money")
@@ -166,13 +171,21 @@ class Store:
                       "merchant_type": "none", "purpose_hint": "prize_fee"})
         items.append({"id": "takeover", "kind": "pause", "type": "cash_out", "counterparty": "A9999", "fresh": True,
                       "name": "Unknown agent point", "amount": int(max(500, balance * 0.9) // 100 * 100), "merchant_type": "none"})
-        listed = sorted(self.reports.seed.values(), key=lambda r: -int(r["reports"]))
+        listed = sorted(self.reports.seed, key=lambda r: -int(r["reports"]))
         normal = int(max(300, min(usual, balance * 0.4)) // 50 * 50)
+        today = state.now.date()
         for name, row, amount in zip(("reported_small", "reported_usual"), listed, (50, normal)):
             if amount <= balance:
+                status = self.reports.status(session, row["number"], today=today)
                 items.append({"id": name, "kind": "pause", "type": "send_money", "counterparty": row["number"], "fresh": True,
                               "name": "Reported number", "amount": amount, "merchant_type": "none",
-                              "reports": int(row["reports"])})
+                              "reports": status["reports"], "confidence": status["confidence"]})
+        single = next((r for r in reversed(listed) if self.reports.status(session, r["number"], today=today)["confidence"] == "low"), None)
+        if single and 200 <= balance:
+            status = self.reports.status(session, single["number"], today=today)
+            items.append({"id": "reported_once", "kind": "nudge", "type": "send_money", "counterparty": single["number"],
+                          "fresh": True, "name": "Number with one report", "amount": 200, "merchant_type": "none",
+                          "reports": status["reports"], "confidence": status["confidence"]})
         if payees["send_money"]:
             friend = payees["send_money"][0]
             items.append({"id": "friend", "kind": "silent", "type": "send_money", "counterparty": friend["counterparty"],

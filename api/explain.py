@@ -5,6 +5,8 @@ from datetime import date
 
 import httpx
 
+from api.security import internal_host
+
 LANGS = ("en", "bn")
 
 CATEGORY_NAMES = {
@@ -125,6 +127,18 @@ TEMPLATES = {
         "1 person has reported this number as a scam.",
         "1 জন গ্রাহক এই নম্বরটিকে প্রতারণার নম্বর হিসেবে রিপোর্ট করেছেন।",
     ),
+    "reported_recent": (
+        "{recent} of those reports came in the last 30 days.",
+        "এর মধ্যে {recent}টি রিপোর্ট এসেছে গত 30 দিনে।",
+    ),
+    "reported_unconfirmed": (
+        "{count} people have reported this number, which is not yet enough to confirm it. Take a moment to be sure before you pay.",
+        "{count} জন এই নম্বরটি নিয়ে অভিযোগ করেছেন, তবে নিশ্চিত হওয়ার জন্য তা এখনো যথেষ্ট নয়। টাকা পাঠানোর আগে একটু ভেবে নিন।",
+    ),
+    "reported_unconfirmed_one": (
+        "1 person has reported this number. One report is not confirmation, so take a moment to be sure before you pay.",
+        "1 জন এই নম্বরটি নিয়ে অভিযোগ করেছেন। একটি অভিযোগে বিষয়টি নিশ্চিত হয় না, তাই টাকা পাঠানোর আগে একটু ভেবে নিন।",
+    ),
     "refund_no_incoming": (
         "You said you are returning money sent to you by mistake, but no money has arrived from this number.",
         "আপনি বলেছেন ভুল করে আসা টাকা ফেরত দিচ্ছেন, কিন্তু এই নম্বর থেকে আপনার কাছে কোনো টাকা আসেনি।",
@@ -177,6 +191,19 @@ SCAM_CODES = {"reported_number", "refund_no_incoming", "refund_exceeds_incoming"
 
 NUMBER_CHECK = {
     "reported": ("Reported as a scam", "প্রতারণার নম্বর হিসেবে রিপোর্ট করা হয়েছে"),
+    "unconfirmed": ("Reported, but not confirmed", "অভিযোগ আছে, তবে নিশ্চিত নয়"),
+    "confidence_high": (
+        "Confidence: high. Many separate customers reported it, and several reports are recent.",
+        "নির্ভরযোগ্যতা: উচ্চ। অনেক আলাদা গ্রাহক রিপোর্ট করেছেন এবং কয়েকটি রিপোর্ট সাম্প্রতিক।",
+    ),
+    "confidence_medium": (
+        "Confidence: medium. Several separate customers reported it.",
+        "নির্ভরযোগ্যতা: মাঝারি। কয়েকজন আলাদা গ্রাহক রিপোর্ট করেছেন।",
+    ),
+    "advice_unconfirmed": (
+        "Be careful with this number. If they ask for your PIN or OTP, a fee, or a refund, do not pay.",
+        "এই নম্বরের ব্যাপারে সতর্ক থাকুন। পিন, ওটিপি, ফি বা টাকা ফেরত চাইলে টাকা পাঠাবেন না।",
+    ),
     "known": ("No reports, and you know this number", "কোনো রিপোর্ট নেই, নম্বরটি আপনার পরিচিত"),
     "unknown": ("No reports yet", "এখনো কোনো রিপোর্ট নেই"),
     "last_reported": ("Last reported on {date}.", "সর্বশেষ রিপোর্ট: {date}।"),
@@ -239,9 +266,17 @@ def render_reason(reason, amount, lang, payment_type="send_money"):
     code = reason["code"]
     if code == "reported_number":
         count = int(reason["count"])
-        text = TEMPLATES["reported_number_one" if count == 1 else code][lang_index(lang)].format(count=money(count))
+        parts = [TEMPLATES["reported_number_one" if count == 1 else code][lang_index(lang)].format(count=money(count))]
+        recent = int(reason.get("recent") or 0)
+        if 0 < recent < count:
+            parts.append(TEMPLATES["reported_recent"][lang_index(lang)].format(recent=money(recent)))
         detail = REPORT_DETAILS.get(reason.get("pattern"))
-        return f"{text} {detail[lang_index(lang)]}" if detail else text
+        if detail:
+            parts.append(detail[lang_index(lang)])
+        return " ".join(parts)
+    if code == "reported_unconfirmed":
+        count = int(reason["count"])
+        return TEMPLATES[code + "_one" if count == 1 else code][lang_index(lang)].format(count=money(count))
     if code == "new_recipient":
         code = NEW_RECIPIENT_VARIANT.get(payment_type, code)
     template = TEMPLATES.get(code)
@@ -290,9 +325,18 @@ def number_check(status, history, lang="en"):
     lang = lang if lang in LANGS else "en"
     i = lang_index(lang)
     lines = []
-    if status["reports"]:
+    level = status.get("confidence", "none")
+    if level in ("medium", "high"):
         verdict = "reported"
-        lines.append(render_reason({"code": "reported_number", "count": status["reports"], "pattern": status["pattern"]}, 0, lang))
+        lines.append(render_reason({"code": "reported_number", "count": status["reports"], "pattern": status["pattern"],
+                                    "recent": status.get("recent_reports", 0)}, 0, lang))
+        lines.append(NUMBER_CHECK[f"confidence_{level}"][i])
+        if status["last_reported"]:
+            when = format_date(date.fromisoformat(status["last_reported"]), lang)
+            lines.append(NUMBER_CHECK["last_reported"][i].format(date=when))
+    elif level == "low":
+        verdict = "unconfirmed"
+        lines.append(render_reason({"code": "reported_unconfirmed", "count": status["reports"]}, 0, lang))
         if status["last_reported"]:
             when = format_date(date.fromisoformat(status["last_reported"]), lang)
             lines.append(NUMBER_CHECK["last_reported"][i].format(date=when))
@@ -318,17 +362,31 @@ def report_options(lang="en"):
     return [{"code": code, "label": names[i]} for code, names in REPORT_PATTERNS.items()]
 
 
+BANGLA_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+
+
 def numbers_in(text):
-    return set(re.findall(r"\d[\d,]*(?:\.\d+)?", text))
+    plain = str(text).translate(BANGLA_DIGITS)
+    return {n.replace(",", "") for n in re.findall(r"\d[\d,]*(?:\.\d+)?", plain)}
 
 
-def llm_settings():
+def llm_status():
     key = os.getenv("LLM_API_KEY", "").strip()
     model = os.getenv("LLM_MODEL", "").strip()
     base = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").strip().rstrip("/")
-    if not key or not model:
+    residency = os.getenv("LLM_DATA_RESIDENCY", "internal_only").strip().lower()
+    configured = bool(key and model)
+    internal = internal_host(base)
+    return {"configured": configured, "residency": residency, "host_internal": internal,
+            "active": configured and (internal or residency == "allow_external")}
+
+
+def llm_settings():
+    if not llm_status()["active"]:
         return None
-    return {"key": key, "model": model, "base": base, "timeout": float(os.getenv("LLM_TIMEOUT", "6"))}
+    return {"key": os.getenv("LLM_API_KEY", "").strip(), "model": os.getenv("LLM_MODEL", "").strip(),
+            "base": os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").strip().rstrip("/"),
+            "timeout": float(os.getenv("LLM_TIMEOUT", "6"))}
 
 
 def chat(system, user, max_tokens=220):
@@ -360,7 +418,7 @@ def rephrase(explanation):
         "Reply with the rewritten alert only."
     )
     text = chat(system, explanation["message"])
-    if not text or len(text) > 480 or not numbers_in(explanation["message"]) <= numbers_in(text):
+    if not text or len(text) > 480 or "http" in text.lower() or numbers_in(explanation["message"]) != numbers_in(text):
         return explanation
     return dict(explanation, message=text, source="llm")
 
@@ -439,7 +497,8 @@ def answer(question, facts, lang="en"):
     )
     user = "FACTS:\n" + json.dumps(facts, default=str, ensure_ascii=False) + "\n\nQUESTION:\n" + question[:300]
     text = chat(system, user, max_tokens=260)
-    if not text or len(text) > 700:
+    known = numbers_in(json.dumps(facts, default=str, ensure_ascii=False)) | numbers_in(fallback) | numbers_in(question)
+    if not text or len(text) > 700 or "http" in text.lower() or not numbers_in(text) <= known:
         return {"answer": fallback, "source": "template", "intent": intent}
     return {"answer": text, "source": "llm", "intent": intent}
 

@@ -10,5 +10,8 @@ data/out/*
 !data/out/.gitkeep
 ml/models/*
 !ml/models/.gitkeep
+data/*.db
+data/*.db-journal
+*.sqlite3
 .DS_Store
 .vscode/
