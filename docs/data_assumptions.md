@@ -125,10 +125,31 @@ random innocent purpose.
 - `api/demo_data/reported_numbers.json` is a hand-written dummy list of five numbers with a report count
   (37, 12, 6, 3 and 1), the most common complaint and the date of the last report. They use the 010
   prefix like every other generated number and do not appear in any customer's history.
-- The reported-number rule plays no part in training or in the measured results. The simulated
-  transactions contain no report data.
-- Reports made in the app are stored in memory per browser session and count each demo customer once
-  per number. They disappear on "Reset the demo" or when the server restarts.
+- On first start the list is expanded into one row per report in the `scam_reports` table, spaced three
+  days apart backwards from the last report date, so that recency weighting has something to work on.
+- Confidence is a score: a report from the last 30 days counts 1, one from 31 to 90 days counts 0.5, an
+  older one counts 0.25. A score of 3 or more is "medium", 10 or more is "high". These levels are starting
+  values chosen by the team, not tuned on data.
+- The reported-number rule plays no part in training or in the measured results. Every simulated scam
+  uses a new number, so the transactions contain nothing a report list could learn from.
+- Reports made in the app are stored in the database. Each demo customer counts once per number. Reports
+  from another browser session count as one reporter per session, so one visitor cannot escalate a number
+  for everyone. Numbers used by the scripted demo story ignore other visitors' reports, so the walkthrough
+  stays repeatable. "Reset the demo" removes only the reports made in that browser session.
+
+## Stress-test settings
+
+`python -m ml.experiments` generates extra populations that are never used for training. Two settings in
+`data/personas.py` are changed for them and then restored:
+
+| Setting | Default | Stress value | Meaning |
+|---|---|---|---|
+| `MODEST_SCAM_SHARE` | 0.3 | 0.7 | Share of refund, prize and takeover scams where the amount is close to what the customer normally sends |
+| `PURPOSE_HONESTY_SCALE` | 1.0 | 0.3 | Multiplier on the chance that a victim states the real purpose |
+
+The random seeds 7, 101 and 2026 give three populations of new customers with the default settings.
+With the default settings and seed 42 the generator produces exactly the same data as before these
+settings were added.
 
 ## Demo customers
 

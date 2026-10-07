@@ -1,64 +1,98 @@
-# Demo and video script
+# Demo script for the final evaluation
 
-About four minutes. Run it on the live app with the Demo guide panel open. Press "Reset the demo" first.
+About six minutes of demo, then questions. Run it on the live app with the Demo guide open on the left
+and "Under the hood" on the right. Press "Reset the demo" first. Open the API address a minute before,
+because the free server sleeps.
 
-## 1. The problem (30 seconds)
+## 1. The problem (45 seconds)
 
 Say:
 
-> Payment fraud cost Bangladesh 926 million taka in 2025. Most of it went through mobile wallets and only
-> about one taka in ten was recovered. In most cases the real owner is talked into sending the money, so
-> the OTP is entered by the right person and cannot help. Thamun, Bangla for "please pause", checks every
-> payment against the customer's own history before the OTP, and coaches everyday spending with the same
-> engine.
+> In Bangladesh the scammer no longer steals your password. They call you and talk you into sending the
+> money yourself: "I sent you money by mistake, please return it", or "pay a fee to claim your prize".
+> You type your own PIN and your own OTP, so to the wallet it is a normal payment. Bangladesh Bank figures
+> reported in June put payment fraud at 926 million taka in 2025, about 88% of it through mobile wallets,
+> and only about one taka in ten was recovered.
+>
+> Thamun, Bangla for "please pause", is a safety layer that sits before the OTP. It protects users from
+> socially engineered payments, explains itself in Bangla or English, and leaves the decision with the
+> customer. Pause. Understand. Decide.
 
-## 2. Rina's month (2 minutes)
+## 2. The demo story (3 minutes)
 
-Rina is a salaried worker. Her salary arrives on the 1st. Today is 8 October in the demo.
+Rina is a salaried worker. Today is 8 October in the demo. Each step is a button in the Demo guide.
 
 | Step | Click | Say |
 |---|---|---|
-| 1 | Run "Pay a bill that is due" (৳1,050), enter any OTP | A known biller and the usual amount. Thamun stays silent. Routine payments get no extra step |
-| 2 | Run "Order food again" (৳450) | Her fifth order this week. One line tells her eating out is at ৳2,100, about 37% above her usual week. It does not block her |
-| 3 | Run "Return money sent by mistake" (৳8,000) | A new number, so Thamun asks what the payment is for. This is the only time it asks |
-| | Choose "Returning money sent to me by mistake" | Now the pause. Four times her usual amount, a number she has never paid, and no money ever arrived from that number, so the refund story is false. It would also leave her ৳1,200 short for electricity in two days |
-| | Point at the right panel | Every reason is traceable: the model score, the SHAP contributions, and the purpose rule, which sits outside the model |
-| | Press "Cancel payment" | She cancels. ৳8,000 stays in her wallet. She could also have paid anyway. Thamun never blocks |
-| 4 | Run "Send a tiny amount to a reported number" (৳50) | Other customers have reported this number, so Thamun pauses whatever the amount and does not even ask the purpose. The first reason is the report count |
-| | Press "Report this number as a scam", pick a reason, then "Cancel payment" | Her report is added. The next customer who tries to pay this number sees one more report |
-| | Open Check, type a number, press Check | Before paying, anyone can look a number up: how many reports, what the callers asked for, and whether she has ever paid it. No reports does not mean safe, and the screen says so |
-| 5 | Open Home | Bill readiness. Thamun found her bills from her history, forecasts her balance to each due date and tells her to cash in three days before one falls short |
-| 6 | Open Review, then Goals, then Ask | Where September went, a plan to save ৳30,000 in six months, and a plain answer to "Why do I always run short before month-end?" |
+| 1 | "Pay a bill that is due" (৳1,050), any OTP | Known biller, usual amount. Thamun stays silent. In our test month 91.0% of payments went through like this, with no question and no message. That is our answer to "it will impact the customer experience" |
+| 2 | "Order food again" (৳450) | One line above the OTP box: eating out is above her usual week. This is the money coach, not a fraud alert, and it never blocks |
+| 3 | "Return money sent by mistake" (৳8,000), choose "Returning money sent to me by mistake" | A new number, so Thamun asks the purpose once. Now the red pause: three reasons, the rule first. No money ever arrived from this number, so the refund story is false |
+| | Open "Why did Thamun pause this?" | The rest is one tap away, with the real values: share of her balance, the bill it would leave short, the risk score against the pause level |
+| | Point at the right panel | The decision is split in three: what the models measured, which fixed rules fired, and how the message was worded. The language model never decides |
+| | "Cancel payment" | Three exits on every pause: cancel, talk to someone first, or continue anyway. Thamun never blocks |
+| 4 | "Send a tiny amount to a reported number" (৳50) | 37 different customers reported this number. Paused at once, even for fifty taka |
+| 5 | "Send to a number with a single report" (৳200) | One report is only a caution. Nobody can make a number alarming for everyone by reporting it once. Confidence needs several different customers, and recent reports count more |
+| 6 | "Send a large amount just before bills are due" (about ৳7,000). If it asks the purpose, choose "Paying or lending to a friend" | A different kind of pause, in teal: "Bill warning, not a scam alert". Nipa is a trusted contact. The risk model is calm. The bill forecast is not |
+| 7 | Evidence, Impact, System tabs | Next section |
 
-## 3. The AI under the hood (1 minute)
+## 3. What changed since Phase 1 (2 minutes)
 
-Show the diagrams in `docs/diagrams/` or the inspector panel.
+Go through the right panel tabs. Each one answers a judge comment.
 
-- A LightGBM model labels each payment and asks the customer only when it is unsure.
-- A LightGBM classifier and an Isolation Forest score how unlike the customer a payment is, using features
-  built from that customer's own history. SHAP values give the reasons.
-- Purpose rules and the bill check are plain code, separate from the models.
-- The LLM only words the message. It cannot change a number or a decision.
-- Switch customer to Salma, an irregular earner, and run the prize-fee payment in Bangla to show the same
-  rules work for a very different customer.
+| Tab | Say |
+|---|---|
+| Evidence | "All data is synthetic" is true and we cannot change that today. What we added: four models compared at the same false-pause budget, an ablation, and a stress test. We froze the models, generated new customers they had never seen, and changed two assumptions against ourselves. Recall went from 96.3% to 92.1%. We quote the lower number first |
+| Evidence, further down | Two findings we did not hide. Random Forest is about as good as LightGBM, and we keep LightGBM for speed and exact SHAP values. The Isolation Forest added no scam payments in our tests, so it is marked for shadow testing |
+| Impact | Three sources kept apart: simulation, this demo session, and real users, which says "not yet measured". User testing mode asks five questions after each warning and counts the answers here |
+| System | Live requests, error rate, risk-check latency, drift check. The load test is real: 50 simultaneous users, 77.0 requests a second, no failures, 300 ms at the 95th percentile on one small worker, and we show where one worker saturates |
+| System, bottom | Reports, the decision log and feedback are in SQL tables now. Session tokens, rate limits and an audit log are in. And nothing has to leave the country: the models are small files on ordinary CPUs, and a public LLM is refused by default |
 
-## 4. Evidence and impact (30 seconds)
+## 4. Close (20 seconds)
 
-Say:
+> Thamun is sold to the wallet, free for the customer. What we have is a working engine, honest synthetic
+> evidence and a plan for validating on real data in four stages. What we do not have yet is real
+> customers, and we say so on screen.
 
-> On a month the models never saw, Thamun paused 96% of injected scam payments with about 0.6 false
-> pauses per customer per month, and completed 97% of payments without asking a single question. The data
-> is synthetic and scam attempts are oversampled, so the next step is controlled validation on anonymised
-> upay data. For upay this means fewer scam losses, more bills paid through the wallet and a reason for
-> customers to make upay their main wallet.
+## Numbers worth remembering
+
+| Number | Meaning |
+|---|---|
+| 96.3% of 54 | Scam payments paused in the held-out month |
+| 92.1% of 190 | The same models on new customers they never saw |
+| 0.58 and 0.66 | False pauses per customer per month, original and new customers |
+| 91.0% | Payments with no interruption at all |
+| 2.7% | Payments where the purpose is asked |
+| 3 and 10 | Report score for "likely" and "confirmed". One recent report counts 1, older ones count less |
+| 50 users, 77.0 requests a second, 300 ms | Load test on one worker |
+| 44 | Automated tests |
+
+Always add "on synthetic data" when quoting a model number.
 
 ## Questions judges may ask
 
 | Question | Answer |
 |---|---|
-| What about a new customer with no history? | Features fall back to neutral values and the purpose rules still work. With real data, a segment-level baseline would be used until the customer has enough history |
-| Why not put the rules in the LLM? | Decisions must be traceable and repeatable. The LLM never sees a decision it could change |
-| Is it fair to low-income users? | Every customer is compared with their own history, and persona is not a model input. False pauses for irregular earners were the lowest of the four groups |
-| What does it miss? | A scam sent through a known contact's hijacked account looks like a normal transfer. Device and location signals in a real wallet would help |
-| Can someone report an honest number to harm them? | In this prototype one report is enough and each customer counts once per number. A pause never blocks, so a false report costs one extra screen. In production we would require several independent reporters, weigh them by their history and review heavily reported numbers |
-| How would it plug into upay? | `POST /check` sits between the payment form and the OTP step. `ml/features.py` builds all features from a plain transaction stream |
+| Your data is still synthetic. What is different now? | We stopped quoting one number from one test. We froze the models and tested them on new populations and with two assumptions changed against us. Recall dropped from 96.3% to 92.1% and we report that. The next step needs a wallet partner: offline replay on anonymised history inside their environment, then shadow mode |
+| Why LightGBM and not Random Forest? | On accuracy they are within one payment of each other in our test. LightGBM scores a payment in a fraction of a millisecond, is a 300 KB file and gives exact SHAP values. A check sits before OTP, so speed matters |
+| Then why keep the Isolation Forest? | Our own ablation says it added nothing on synthetic data. We left it on today so the decision behaviour did not change on the final day without a full re-test. In shadow mode on real data it either catches something LightGBM missed or it is removed |
+| What stops someone reporting an honest number? | One report per customer per number, five reports a day, and one report is only a caution. A pause needs several different customers, with recent reports counting more. A pause never blocks. Production would add reporter reputation, manual review and an appeal path |
+| Where does customer data go? | Nowhere. Models and rules run inside the API process on ordinary CPUs. The only component that could call out is the optional language model, and by default it is refused unless its address is internal |
+| What is still in memory? | The sandbox copy of the four demo customers, one per browser session, so judges do not affect each other. Also the rate limiter and live counters. Reports, the decision log and feedback are in the database. In a wallet, history comes from the ledger and a feature store |
+| Did you test with real users? | The tool is built and counts answers in the Impact tab. Whatever number is shown there is what was actually collected. We do not claim a result we did not measure |
+| What happens if Thamun is down? | The payment service continues to OTP as it does today. Thamun must never be able to stop payments by failing |
+| Can it handle a real wallet's volume? | One worker handled 77.0 requests a second on a two-core machine and then queued. Workers become stateless once history comes from a feature store, so capacity grows by adding workers. That scaling is the design and has not been measured |
+| Does the LLM decide anything? | No. Decisions are made by code from model scores and rules. The LLM may only reword a finished message, and the reworded text is thrown away unless every number matches. The live demo runs with no LLM at all |
+| What does it miss? | A scam sent through a known contact's hijacked account. It looks like a normal transfer to a friend. Device and location signals in a real wallet would help |
+| What about a new customer with no history? | Features fall back to neutral values and the purpose rules and report list still work. With real data a segment baseline would be used until the customer has history |
+| How does the wallet make money from this? | It does not charge the customer. The provider pays because an authorised scam costs a complaint, an unrecovered loss and often the customer. We defined the measures and the control-group design. None is measured yet |
+| Did you use AI tools? | Yes, an AI coding assistant, as the rules allow. We can explain every file |
+
+## Who explains what
+
+| Member | Area |
+|---|---|
+| Tammam Ibn Aman | Data generator, features, models, experiments, evaluation |
+| Sachin Sarker | API, database, security, monitoring, load test |
+| Deep Mitra | Web app, pause page, user testing mode, the four panel tabs |
+
+Every member should be able to give the 45-second problem statement and walk the demo story.
