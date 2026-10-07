@@ -4,7 +4,7 @@ import { day } from './format'
 import { translator } from './i18n'
 import DemoGuide from './components/DemoGuide'
 import Icon from './components/Icon'
-import Inspector from './components/Inspector'
+import SidePanel from './components/SidePanel'
 import Ask from './screens/Ask'
 import Check from './screens/Check'
 import Goals from './screens/Goals'
@@ -27,8 +27,10 @@ export default function App() {
   const [preset, setPreset] = useState(null)
   const [lastCheck, setLastCheck] = useState(null)
   const [lookup, setLookup] = useState(null)
-  const [metrics, setMetrics] = useState(null)
+  const [evidence, setEvidence] = useState(null)
   const [panel, setPanel] = useState(null)
+  const [panelTab, setPanelTab] = useState('decision')
+  const [testing, setTesting] = useState(false)
   const t = useMemo(() => translator(lang), [lang])
 
   useEffect(() => {
@@ -41,7 +43,9 @@ export default function App() {
           if (stopped) return
           setCustomers(list)
           setStatus('ready')
-          api.metrics().then((m) => !stopped && setMetrics(m)).catch(() => {})
+          api.evidence().then((e) => !stopped && setEvidence(e)).catch(() => {
+            api.metrics().then((m) => !stopped && setEvidence({ metrics: m })).catch(() => {})
+          })
         })
         .catch(() => {
           if (stopped) return
@@ -110,6 +114,16 @@ export default function App() {
     setPanel(null)
   }
 
+  const showPanel = (name) => {
+    setPanelTab(name)
+    setPanel('why')
+  }
+
+  const checked = (data) => {
+    setLastCheck(data)
+    setPanelTab('decision')
+  }
+
   if (status !== 'ready') {
     return (
       <div className="boot">
@@ -129,7 +143,7 @@ export default function App() {
     <div className="stage">
       <aside className={`side ${panel === 'guide' ? 'open' : ''}`}>
         <DemoGuide customer={customer} customerId={customerId} version={version + resets} onRun={runScenario} onGo={go}
-          onCheckNumber={checkNumber} onSendTo={sendTo}
+          testing={testing} onTesting={setTesting} onPanel={showPanel} onCheckNumber={checkNumber} onSendTo={sendTo}
           onReset={resetDemo} onClose={() => setPanel(null)} />
       </aside>
 
@@ -147,14 +161,14 @@ export default function App() {
               {lang === 'en' ? 'বাংলা' : 'EN'}
             </button>
           </header>
-          <div className="notice">{t('demoBanner')} {home ? `${t('today')}: ${day(home.now, lang)}` : ''}</div>
+          <div className="notice">{t('demoBanner')} {home ? `${t('today')}: ${day(home.now, lang)}` : ''}{testing ? ` · ${t('testingOn')}` : ''}</div>
 
           <div className="screen">
             {tab === 'home' && <Home home={home} t={t} lang={lang} customerId={customerId}
               onPay={(type) => { setPreset({ type, blank: true, nonce: Date.now() }); setTab('pay') }} onVerify={() => setTab('verify')}
-              onChanged={refresh} />}
+              onGoals={() => setTab('goals')} onChanged={refresh} />}
             {tab === 'pay' && <Pay key={`${customerId}-${resets}`} customerId={customerId} lang={lang} t={t} home={home} preset={preset}
-              onPresetUsed={() => setPreset(null)} onCheck={setLastCheck} onChanged={refresh} onHome={() => setTab('home')} />}
+              testing={testing} onPresetUsed={() => setPreset(null)} onCheck={checked} onChanged={refresh} onHome={() => setTab('home')} />}
             {tab === 'verify' && <Check key={resets} customerId={customerId} lang={lang} t={t} preset={lookup} version={version}
               onChanged={refresh} onSendTo={sendTo} />}
             {tab === 'review' && <Review customerId={customerId} lang={lang} t={t} version={version} />}
@@ -164,7 +178,7 @@ export default function App() {
 
           <div className="mobile-switch">
             <button onClick={() => setPanel('guide')}>Demo guide</button>
-            <button onClick={() => setPanel('why')}>Why it decided{lastCheck && lastCheck.decision !== 'silent' ? ' •' : ''}</button>
+            <button onClick={() => setPanel('why')}>Under the hood{lastCheck && lastCheck.decision !== 'silent' ? ' •' : ''}</button>
           </div>
 
           <nav className="tabs" aria-label="Sections">
@@ -179,7 +193,7 @@ export default function App() {
       </main>
 
       <aside className={`side ${panel === 'why' ? 'open' : ''}`}>
-        <Inspector check={lastCheck} metrics={metrics} onClose={() => setPanel(null)} />
+        <SidePanel tab={panelTab} onTab={setPanelTab} check={lastCheck} evidence={evidence} version={version + resets} onClose={() => setPanel(null)} />
       </aside>
     </div>
   )

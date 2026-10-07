@@ -5,11 +5,12 @@ import { clock, day, taka } from '../format'
 
 const TYPES = ['send_money', 'merchant_payment', 'bill_payment', 'cash_out', 'mobile_recharge']
 
-export default function Home({ home, t, lang, customerId, onPay, onVerify, onChanged }) {
+export default function Home({ home, t, lang, customerId, onPay, onVerify, onGoals, onChanged }) {
   const [busy, setBusy] = useState(false)
   if (!home) return <div className="pad muted">…</div>
-  const { bills } = home
+  const { bills, protection, spending, goal } = home
   const soon = bills.bills.filter((b) => b.days_left <= 21)
+  const active = (spending || []).filter((s) => s.usual_week > 0)
 
   const cashIn = async (amount) => {
     setBusy(true)
@@ -24,7 +25,7 @@ export default function Home({ home, t, lang, customerId, onPay, onVerify, onCha
         <div className="balance-label">{t('balance')}</div>
         <div className="balance-value">{taka(home.balance)}</div>
         <div className="balance-name">{home.customer.name}</div>
-        {home.protected > 0 && <div className="protected">{taka(home.protected)} {t('protected')}</div>}
+        <p className="tagline">{t('tagline')}</p>
       </section>
 
       <section className="actions" aria-label={t('pay')}>
@@ -36,15 +37,49 @@ export default function Home({ home, t, lang, customerId, onPay, onVerify, onCha
         ))}
       </section>
 
-      <button className="scam-card" onClick={onVerify}>
-        <span className="action-icon"><Icon name="verify" size={20} /></span>
-        <span>
-          <strong>{t('scamCard')}</strong>
-          <small>{t('scamCardSub')}</small>
-        </span>
-      </button>
+      <section className="card protect">
+        <div className="card-head">
+          <span className="action-icon"><Icon name="verify" size={20} /></span>
+          <div>
+            <h2>{t('protectTitle')}</h2>
+            <p>{t('protectSub')}</p>
+          </div>
+        </div>
+        {protection && (
+          <dl className="stats">
+            <div><dd>{protection.checked}</dd><dt>{t('statChecked')}</dt></div>
+            <div><dd>{protection.pauses}</dd><dt>{t('statPauses')}</dt></div>
+            <div><dd>{protection.cancelled}</dd><dt>{t('statCancelled')}</dt></div>
+            <div><dd>{taka(protection.kept_safe)}</dd><dt>{t('statKept')}</dt></div>
+          </dl>
+        )}
+        <button className="btn danger-soft" onClick={onVerify}>{t('scamCardSub')}</button>
+      </section>
 
-      <section>
+      <div className="divider"><span>{t('coachTitle')}</span></div>
+
+      {active.length > 0 && (
+        <section className="card">
+          <h2>{t('spendTitle')}</h2>
+          <ul className="spend">
+            {active.map((s) => {
+              const over = s.ratio > 1.25
+              return (
+                <li key={s.category}>
+                  <div className="spend-top">
+                    <span className="row-title">{s.name}</span>
+                    <span className={over ? 'over' : ''}>{taka(s.week_total)} <small>/ {t('usualShort', { amount: taka(s.usual_week) })}</small></span>
+                  </div>
+                  <div className="spend-bar"><i className={over ? 'over' : ''} style={{ width: `${Math.min(100, (s.ratio / 1.5) * 100)}%` }} /><b /></div>
+                </li>
+              )
+            })}
+          </ul>
+          <p className="footnote">{t('spendNote')}</p>
+        </section>
+      )}
+
+      <section className="card">
         <h2>{t('bills')}</h2>
         {soon.length === 0 && <p className="muted">{t('noBills')}</p>}
         {bills.reminder && (
@@ -70,6 +105,18 @@ export default function Home({ home, t, lang, customerId, onPay, onVerify, onCha
           ))}
         </ul>
         {bills.daily_spend > 0 && <p className="footnote">{t('spendPerDay', { amount: taka(bills.daily_spend) })}</p>}
+      </section>
+
+      <section className="card">
+        <h2>{t('goalTitle')}</h2>
+        {goal ? (
+          <>
+            <p>{t('savedSoFar', { a: taka(goal.progress.saved), b: taka(goal.target) })}</p>
+            <div className="spend-bar"><i style={{ width: `${Math.min(100, (goal.progress.saved / goal.target) * 100)}%` }} /></div>
+            <p className="footnote">{taka(goal.per_week)} {t('perWeek')}</p>
+          </>
+        ) : <p className="muted">{t('goalEmpty')}</p>}
+        <button className="btn" onClick={onGoals}>{goal ? t('goalOpen') : t('goalStart')}</button>
       </section>
 
       <section>

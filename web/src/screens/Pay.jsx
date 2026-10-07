@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import FeedbackForm from '../components/FeedbackForm'
 import Icon from '../components/Icon'
 import ReportBox from '../components/ReportBox'
-import { day, taka } from '../format'
+import { day, percent, taka } from '../format'
 
 const TYPES = ['send_money', 'merchant_payment', 'bill_payment', 'cash_out', 'mobile_recharge']
 const FREE_ENTRY = { send_money: true, cash_out: true }
 const REPORTABLE = { send_money: true, cash_out: true }
 
-export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, onCheck, onChanged, onHome }) {
+export default function Pay({ customerId, lang, t, home, preset, testing, onPresetUsed, onCheck, onChanged, onHome }) {
   const [step, setStep] = useState('form')
   const [type, setType] = useState('send_money')
   const [book, setBook] = useState(null)
@@ -30,6 +31,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
   const seen = useRef(null)
   const amountBox = useRef(null)
   const [warn, setWarn] = useState(null)
+  const [study, setStudy] = useState('free')
 
   useEffect(() => {
     let stopped = false
@@ -94,6 +96,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     if (!preset || seen.current === preset.nonce) return
     seen.current = preset.nonce
     onPresetUsed()
+    setStudy(preset.study || 'free')
     setType(preset.type)
     setError('')
     setReceipt(null)
@@ -124,6 +127,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     if (!(Number(amount) > 0)) return setError(t('enterAmount'))
     const pay = { type, counterparty: chosen.counterparty, name: chosen.name, amount: Number(amount), merchant_type: chosen.merchant_type }
     setPayment(pay)
+    setStudy('free')
     return runCheck(pay)
   }
 
@@ -162,6 +166,10 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
   const text = result ? (result.i18n && result.i18n[lang]) || result : null
   const labelName = result && result.label ? result.label.custom || (result.label.names && result.label.names[lang]) || result.label.name : ''
   const categoryName = (code, fallback) => (book && book.categories.find((c) => c.code === code)?.label) || fallback
+  const warned = result && (result.decision === 'pause' || result.decision === 'nudge')
+  const feedback = testing && result ? (warned
+    ? <FeedbackForm key={result.check_id} scenario={study} decision={result.decision} lang={lang} t={t} />
+    : <p className="footnote">{t('fbNothing')}</p>) : null
   const reportBox = result && REPORTABLE[payment.type] ? (
     <ReportBox key={result.check_id} customerId={customerId} number={result.counterparty} lang={lang} t={t}
       options={book ? book.report_options : []} already={reported} onDone={() => { setReported(true); onChanged() }} />
@@ -194,27 +202,52 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
   }
 
   if (step === 'pause') {
+    const d = result.details
+    const bill = result.pause_kind === 'bill'
+    const shown = new Set(text.reasons.map((r) => r.code))
+    const facts = []
+    if (REPORTABLE[payment.type] && !shown.has('new_recipient')) facts.push(d.features.new_recipient ? t('whyNew') : t('whyKnown', { n: d.features.times_paid_before }))
+    if (d.features.usual_amount > 0 && !shown.has('amount_vs_usual')) facts.push(t('whyAmount', { ratio: d.features.amount_ratio, usual: taka(d.features.usual_amount) }))
+    if (!shown.has('balance_share')) facts.push(t('whyBalance', { pct: percent(Math.min(d.features.balance_share, 1)) }))
+    if (d.reported && d.reported.reports > 0 && !shown.has('reported_number')) facts.push(t('whyReports', { n: d.reported.reports, recent: d.reported.recent_reports }))
+    if (d.purpose === 'refund_mistake' && !shown.has('refund_no_incoming')) facts.push(t('whyReceived', { amount: taka(d.features.received_from_recipient_72h) }))
+    if (d.affordability && !shown.has('bill_shortfall')) facts.push(t('whyBill', { bill: d.affordability.bill, amount: taka(d.affordability.bill_amount), date: day(d.affordability.due_date, lang) }))
+    if (!bill) facts.push(t('whyScore', { score: d.risk.probability.toFixed(2), level: d.risk.threshold.toFixed(2) }))
+    const fixedRules = new Set(d.rules)
+    const ordered = [...text.reasons].sort((a, b) => Number(fixedRules.has(b.code)) - Number(fixedRules.has(a.code)))
+    const top = ordered.slice(0, 3)
+    const more = ordered.slice(3).map((r) => r.text)
     return (
-      <div className="pause" role="alertdialog" aria-labelledby="pause-title">
+      <div className={`pause ${bill ? 'bill' : ''}`} role="alertdialog" aria-labelledby="pause-title">
+        <span className="risk-badge">{bill ? t('riskBill') : t('riskScam')}</span>
         <div className="pause-word" aria-hidden="true">{t('pauseWord')}</div>
         <h1 id="pause-title">{text.headline}</h1>
         <p className="pause-sum">{taka(result.amount)} · {result.counterparty_name}</p>
+        <p className="pause-motto">{t('motto')}</p>
         {text.source === 'llm' && <p className="pause-lead">{text.message}</p>}
         <ul className="reasons">
-          {text.reasons.map((r) => <li key={r.code}>{r.text}</li>)}
+          {top.map((r) => <li key={r.code}>{r.text}</li>)}
         </ul>
+        <details className="why">
+          <summary>{t('whyTitle')}</summary>
+          <ul>
+            {[...more, ...facts].map((line) => <li key={line}>{line}</li>)}
+          </ul>
+          <p>{t('whyHow')}</p>
+        </details>
         <p className="pause-advice">{text.advice}</p>
         <div className="pause-actions">
           <button className="btn light" disabled={busy} onClick={() => finish('cancel')}>{t('cancelPay')}</button>
           <button className="btn ghost" onClick={() => setCallTip(!callTip)}>{t('callFirst', { name: result.trusted_name || '…' })}</button>
           {callTip && <p className="pause-tip">{t('callTip')}</p>}
-          {reportBox}
+          {!bill && reportBox}
           <label className="agree">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
             <span>{t('readIt')}</span>
           </label>
           <button className="btn outline" disabled={!agree} onClick={() => setStep('otp')}>{t('proceed')}</button>
         </div>
+        <p className="pause-own">{t('yourChoice')}</p>
       </div>
     )
   }
@@ -269,6 +302,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
           </div>
         )}
         <p className="muted">{t('balance')}: {taka(receipt.balance)}</p>
+        {feedback}
         <button className="btn primary" onClick={onHome}>{t('done')}</button>
         <button className="btn" onClick={restart}>{t('another')}</button>
       </div>
@@ -282,7 +316,8 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
         <h1>{t('cancelled')}</h1>
         <p>{t('stayed', { amount: taka(result.amount) })}</p>
         <p className="muted">{t('balance')}: {taka(receipt.balance)}</p>
-        {result.decision === 'pause' && reportBox}
+        {result.decision === 'pause' && result.pause_kind !== 'bill' && reportBox}
+        {feedback}
         <button className="btn primary" onClick={onHome}>{t('done')}</button>
         <button className="btn" onClick={restart}>{t('another')}</button>
       </div>

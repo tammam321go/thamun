@@ -22,6 +22,6 @@ export function clock(iso) {
 }
 
 export function percent(value, digits = 0) {
-  if (value === null || value === undefined) return 'n/a'
+  if (value === null || value === undefined) return 'no data'
   return `${(value * 100).toFixed(digits)}%`
 }
