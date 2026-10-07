@@ -173,7 +173,12 @@ def test_llm_output_is_rejected_when_numbers_change(monkeypatch):
     base = explain.explain("pause", [{"code": "amount_vs_usual", "ratio": 4.0, "usual": 2000}], 8000, "en")
     monkeypatch.setenv("LLM_API_KEY", "x")
     monkeypatch.setenv("LLM_MODEL", "x")
+    monkeypatch.setenv("LLM_DATA_RESIDENCY", "allow_external")
     monkeypatch.setattr(explain, "chat", lambda *a, **k: "This 9,000 transfer looks fine.")
+    assert explain.rephrase(base)["source"] == "template"
+    monkeypatch.setattr(explain, "chat", lambda *a, **k: "Careful: 8,000 is about 4 times your usual 2,000. Call 16247.")
+    assert explain.rephrase(base)["source"] == "template"
+    monkeypatch.setattr(explain, "chat", lambda *a, **k: "Careful: this 8,000 transfer is large.")
     assert explain.rephrase(base)["source"] == "template"
     monkeypatch.setattr(explain, "chat", lambda *a, **k: "Careful: 8,000 is about 4 times your usual 2,000.")
     assert explain.rephrase(base)["source"] == "llm"
@@ -255,45 +260,101 @@ def test_bad_input_is_rejected():
     assert unknown.status_code == 404
 
 
-def test_reported_number_pauses_any_amount_and_leads_the_reasons():
-    from api.engine import report_rule
+def test_confirmed_reports_pause_any_amount_and_lead_the_reasons():
+    from api.engine import report_note, report_rule
 
-    assert report_rule(None) == []
-    assert report_rule({"reports": 0, "pattern": None}) == []
-    rule = report_rule({"reports": 4, "pattern": "prize_fee"})
+    assert report_rule(None) == [] and report_note(None) == []
+    assert report_rule({"reports": 0, "confidence": "none", "pattern": None}) == []
+    rule = report_rule({"reports": 4, "recent_reports": 3, "confidence": "medium", "pattern": "prize_fee"})
     risk = {"high": False, "reasons": [{"code": "new_recipient"}]}
     decision, reasons, flags = decide({"type": "send_money", "amount": 20}, risk, rule, None, None)
     assert decision == "pause" and flags["rules"]
-    assert reasons[0] == {"code": "reported_number", "count": 4, "pattern": "prize_fee"}
+    assert reasons[0] == {"code": "reported_number", "count": 4, "pattern": "prize_fee", "confidence": "medium", "recent": 3}
 
 
-def test_report_book_counts_each_customer_once():
-    from api.reports import ReportBook, normalise
+def test_a_single_report_is_a_note_not_a_pause():
+    from api.engine import report_note, report_rule
+
+    one = {"reports": 1, "recent_reports": 1, "confidence": "low", "pattern": "refund"}
+    assert report_rule(one) == []
+    notes = report_note(one)
+    decision, reasons, flags = decide({"type": "send_money", "amount": 5000}, quiet_risk(), [], None, None, notes=notes)
+    assert decision == "nudge" and not flags["rules"]
+    assert reasons == [{"code": "reported_unconfirmed", "count": 1}]
+
+
+def test_report_confidence_needs_several_recent_reporters():
+    from api.reports import reputation
+
+    assert reputation([])["confidence"] == "none"
+    assert reputation([1])["confidence"] == "low"
+    assert reputation([1, 2])["confidence"] == "low"
+    assert reputation([1, 2, 3])["confidence"] == "medium"
+    assert reputation([200] * 10)["confidence"] == "low"
+    assert reputation([40] * 6)["confidence"] == "medium"
+    assert reputation([5] * 10)["confidence"] == "high"
+    old = reputation([120, 130, 140])
+    assert old["reports"] == 3 and old["recent_reports"] == 0 and old["score"] == 0.75
+
+
+def test_report_book_counts_each_reporter_once(tmp_path):
+    from api.db import Database
+    from api.reports import DAILY_LIMIT, ReportBook, normalise
     from api.store import DEMO_DIR
 
-    book = ReportBook(DEMO_DIR / "reported_numbers.json")
+    book = ReportBook(Database(f"sqlite:///{tmp_path / 'book.db'}"), DEMO_DIR / "reported_numbers.json")
     today = date(2026, 10, 8)
-    assert normalise("+880 1012-345678") == "01012345678"
-    assert book.status("s1", "01012345678")["reports"] == 0
-    assert book.add("s1", "D0001", "01012345678", "pin_otp", today)
-    assert not book.add("s1", "D0001", "01012345678", "pin_otp", today)
-    assert book.add("s1", "D0002", "+8801012345678", None, today)
-    status = book.status("s1", "01012345678", "D0001")
-    assert status["reports"] == 2 and status["pattern"] == "pin_otp" and status["you_reported"]
-    assert book.status("s2", "01012345678")["reports"] == 0
-    listed = next(iter(book.seed))
-    assert book.status("s2", listed)["reports"] == book.seed[listed]["reports"]
+    number = "01012345678"
+    assert normalise("+880 1012-345678") == number
+    assert book.status("s1", number)["confidence"] == "none"
+    assert book.add("s1", "r1", number, "pin_otp", today) == "added"
+    assert book.add("s1", "r1", number, "pin_otp", today) == "duplicate"
+    assert book.status("s1", number, "r1", today)["confidence"] == "low"
+    assert book.add("s1", "r2", "+8801012345678", None, today) == "added"
+    assert book.add("s1", "r3", number, "pin_otp", today) == "added"
+    status = book.status("s1", number, "r1", today)
+    assert status["reports"] == 3 and status["confidence"] == "medium"
+    assert status["pattern"] == "pin_otp" and status["you_reported"] and status["from_session"] == 3
+    seen_elsewhere = book.status("s2", number, "r9", today)
+    assert seen_elsewhere["reports"] == 1 and seen_elsewhere["confidence"] == "low" and seen_elsewhere["from_community"] == 1
+    assert not seen_elsewhere["you_reported"]
+    for i in range(DAILY_LIMIT):
+        assert book.add("s3", "busy", f"0105550000{i}", None, today) == "added"
+    assert book.add("s3", "busy", "01055500009", None, today) == "limit"
+    listed = book.seed[0]
+    assert book.status("s2", listed["number"], today=today)["reports"] == listed["reports"]
     book.clear("s1")
-    assert book.status("s1", "01012345678")["reports"] == 0
+    assert book.status("s1", number, today=today)["reports"] == 0
+    assert book.status("s1", listed["number"], today=today)["reports"] == listed["reports"]
+
+
+def test_demo_story_numbers_ignore_reports_from_other_visitors(tmp_path):
+    from api.db import Database
+    from api.reports import ReportBook
+    from api.store import DEMO_DIR
+
+    book = ReportBook(Database(f"sqlite:///{tmp_path / 'book.db'}"), DEMO_DIR / "reported_numbers.json")
+    book.protected = {"01077001234"}
+    today = date(2026, 10, 8)
+    for session in ("a", "b", "c"):
+        book.add(session, f"r-{session}", "01077001234", "refund", today)
+        book.add(session, f"r-{session}", "01011112222", "refund", today)
+    assert book.status("z", "01077001234", today=today)["confidence"] == "none"
+    assert book.status("z", "01011112222", today=today)["confidence"] == "medium"
+    assert book.status("a", "01077001234", today=today)["reports"] == 1
 
 
 def test_reported_reason_exists_in_both_languages():
-    reason = {"code": "reported_number", "count": 37, "pattern": "prize_fee"}
+    reason = {"code": "reported_number", "count": 37, "pattern": "prize_fee", "confidence": "high", "recent": 10}
     english = explain.explain("pause", [reason], 50, "en")
     bangla = explain.explain("pause", [reason], 50, "bn")
     assert "37 people" in english["reasons"][0]["text"] and "37 জন" in bangla["reasons"][0]["text"]
+    assert "10" in english["reasons"][0]["text"] and "10" in bangla["reasons"][0]["text"]
     assert english["advice"] and bangla["advice"] and english["advice"] != bangla["advice"]
     assert explain.render_reason({"code": "reported_number", "count": 1, "pattern": None}, 0, "en").startswith("1 person")
+    soft = {"code": "reported_unconfirmed", "count": 1}
+    assert explain.render_reason(soft, 0, "en") != explain.render_reason(soft, 0, "bn")
+    assert "not confirmation" in explain.render_reason(soft, 0, "en")
     for names in list(explain.REPORT_PATTERNS.values()) + list(explain.REPORT_DETAILS.values()) + list(explain.NUMBER_CHECK.values()):
         assert all(names)
 
@@ -306,10 +367,13 @@ def test_scam_number_check_and_reporting_end_to_end():
 
     client = TestClient(app)
     headers = {"X-Session": "pytest-reports"}
+    other_session = {"X-Session": "pytest-reports-other"}
     client.post("/demo/reset", json={}, headers=headers)
+    client.post("/demo/reset", json={}, headers=other_session)
     script = {s["id"]: s for s in client.get("/demo/script", params={"customer_id": "D0001"}, headers=headers).json()}
     known = set(store.directory) | {n for book in store.contacts.values() for n in book}
-    assert not known & set(store.reports.seed)
+    assert not known & {row["number"] for row in store.reports.seed}
+    assert all(item["expected"] == item["kind"] for item in script.values())
 
     def check(customer, number, amount, session=headers, lang="en"):
         body = {"customer_id": customer, "type": "send_money", "counterparty": number, "amount": amount, "lang": lang}
@@ -318,34 +382,52 @@ def test_scam_number_check_and_reporting_end_to_end():
     def look(number, lang="en"):
         return client.get("/reports/check", params={"customer_id": "D0001", "number": number, "lang": lang}, headers=headers).json()
 
+    def report(customer, number, session=headers):
+        return client.post("/reports", json={"customer_id": customer, "number": number, "pattern": "pin_otp"}, headers=session)
+
     for name in ("reported_small", "reported_usual"):
         item = script[name]
         result = check("D0001", item["counterparty"], item["amount"], lang="bn")
-        assert result["decision"] == "pause" and result["reasons"][0]["code"] == "reported_number"
+        assert result["decision"] == "pause" and result["risk_level"] == "high"
+        assert result["reasons"][0]["code"] == "reported_number"
         assert result["details"]["reported"]["reports"] == item["reports"]
+        assert result["details"]["reported"]["confidence"] == "high"
         assert result["i18n"]["bn"]["reasons"][0]["text"] == result["reasons"][0]["text"]
         assert str(item["reports"]) in result["i18n"]["en"]["reasons"][0]["text"]
         assert result["i18n"]["en"]["headline"] != result["i18n"]["bn"]["headline"]
     assert script["reported_small"]["amount"] <= 50
 
+    once = check("D0001", script["reported_once"]["counterparty"], script["reported_once"]["amount"])
+    assert once["decision"] == "nudge" and once["reasons"][0]["code"] == "reported_unconfirmed"
+    assert look(script["reported_once"]["counterparty"])["verdict"] == "unconfirmed"
+
     fresh = "01033221100"
     assert check("D0001", fresh, 100)["decision"] == "silent"
     assert look(fresh)["verdict"] == "unknown"
-    first = client.post("/reports", json={"customer_id": "D0001", "number": "+880 1033-221100", "pattern": "pin_otp"}, headers=headers).json()
-    assert first["added"] and first["reports"] == 1 and first["verdict"] == "reported" and first["you_reported"]
-    again = client.post("/reports", json={"customer_id": "D0001", "number": fresh, "pattern": "pin_otp"}, headers=headers).json()
-    assert not again["added"] and again["reports"] == 1
-    other = check("D0002", fresh, 100)
-    assert other["decision"] == "pause" and other["reasons"][0]["code"] == "reported_number"
-    assert check("D0002", fresh, 100, {"X-Session": "pytest-reports-other"})["decision"] == "silent"
+    first = report("D0001", "+880 1033-221100").json()
+    assert first["added"] and first["result"] == "added" and first["reports"] == 1
+    assert first["verdict"] == "unconfirmed" and first["confidence"] == "low" and first["you_reported"]
+    again = report("D0001", fresh).json()
+    assert not again["added"] and again["result"] == "duplicate" and again["reports"] == 1
+    soft = check("D0002", fresh, 100)
+    assert soft["decision"] == "nudge" and soft["reasons"][0]["code"] == "reported_unconfirmed"
+    assert report("D0002", fresh).json()["confidence"] == "low"
+    third = report("D0003", fresh).json()
+    assert third["reports"] == 3 and third["confidence"] == "medium" and third["verdict"] == "reported"
+    hard = check("D0004", fresh, 100)
+    assert hard["decision"] == "pause" and hard["reasons"][0]["code"] == "reported_number"
+    elsewhere = check("D0002", fresh, 100, other_session)
+    assert elsewhere["decision"] == "nudge" and elsewhere["details"]["reported"]["from_community"] == 1
     assert fresh in [row["number"] for row in client.get("/reports", headers=headers).json()]
+    assert "reporter" not in client.get("/reports", headers=headers).text
 
     options = client.get("/reports/options", params={"lang": "bn"}).json()
     assert [o["code"] for o in options] == list(explain.REPORT_PATTERNS) and options[0]["label"] == explain.REPORT_PATTERNS["refund"][1]
     trusted = store.customers["D0001"]["trusted_contact"]
     assert look(trusted)["verdict"] == "known" and look(trusted, "bn")["headline"] != look(trusted)["headline"]
-    assert client.post("/reports", json={"customer_id": "D0001", "number": "B-ELEC"}, headers=headers).status_code == 400
+    assert report("D0001", "B-ELEC").status_code == 400
     assert client.get("/reports/check", params={"customer_id": "D0001", "number": "!!"}, headers=headers).status_code == 400
 
     client.post("/demo/reset", json={}, headers=headers)
     assert check("D0002", fresh, 100)["decision"] == "silent"
+    assert look(script["reported_small"]["counterparty"])["confidence"] == "high"
