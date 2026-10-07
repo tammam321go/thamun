@@ -80,6 +80,33 @@ class ResetRequest(BaseModel):
     customer_id: Optional[str] = Field(default=None, pattern=r"^[A-Z]\d{4}$")
 
 
+Answer = Literal["yes", "partly", "no"]
+
+
+class SessionRequest(BaseModel):
+    customer_id: Optional[str] = Field(default=None, pattern=r"^[A-Z]\d{4}$")
+
+
+class FeedbackRequest(BaseModel):
+    scenario: Literal["normal", "unusual", "new_recipient", "reported", "bill_risk", "overspending", "free"]
+    decision: Optional[Literal["silent", "nudge", "pause"]] = None
+    lang: Language = "en"
+    understood_warning: Answer
+    understood_reason: Answer
+    intrusive: Answer
+    understood_choice: Answer
+    preferred_lang: Literal["bn", "en", "both"]
+    comment: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("comment")
+    @classmethod
+    def tidy(cls, value):
+        if value is None:
+            return None
+        kept = "".join(ch for ch in value if ch.isalnum() or ch in " .,!?-'")
+        return " ".join(kept.split())[:200] or None
+
+
 class ReportRequest(BaseModel):
     customer_id: str = Field(pattern=r"^[A-Z]\d{4}$")
     number: str = Field(min_length=4, max_length=24, pattern=r"^[A-Za-z0-9+\- ]+$")
