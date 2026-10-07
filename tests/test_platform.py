@@ -52,7 +52,7 @@ def test_tokens_are_signed_and_expire(monkeypatch):
     with pytest.raises(HTTPException) as bad:
         security.read_token(token[:-3] + "abc")
     assert bad.value.status_code == 401
-    forged = jwt.encode({"sid": "x", "exp": int(time.time()) + 60}, "another-secret", algorithm="HS256")
+    forged = jwt.encode({"sid": "x", "exp": int(time.time()) + 60}, "another-secret-that-is-long-enough-000000", algorithm="HS256")
     with pytest.raises(HTTPException):
         security.read_token(forged)
     expired = jwt.encode({"sid": "x", "exp": int(time.time()) - 5}, security.SECRET, algorithm="HS256")
@@ -252,3 +252,83 @@ def test_feedback_analytics_and_monitoring_use_real_counts():
     health = client.get("/health").json()
     assert health["version"] == "2.0.0" and health["database"] == "sqlite" and health["database_ok"]
     assert "label" in client.get("/evidence").json()
+
+
+@needs_models
+def test_demo_story_matches_the_engine_and_separates_scam_from_bill_pauses():
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+
+    client = TestClient(app)
+    headers = {"X-Session": "pytest-story"}
+    client.post("/demo/reset", json={}, headers=headers)
+    script = {s["id"]: s for s in client.get("/demo/script", params={"customer_id": "D0001"}, headers=headers).json()}
+    assert {"bill", "food", "refund", "reported_small", "reported_once", "bill_risk"} <= set(script)
+    assert all(item["expected"] == item["kind"] for item in script.values())
+    allowed = {"normal", "unusual", "new_recipient", "reported", "bill_risk", "overspending", "free"}
+    assert {item["study"] for item in script.values()} <= allowed
+
+    def run(item, purpose=None):
+        body = {"customer_id": "D0001", "type": item["type"], "counterparty": item["counterparty"], "amount": item["amount"]}
+        if purpose:
+            body["purpose"] = purpose
+        return client.post("/check", json=body, headers=headers).json()
+
+    quiet = run(script["bill"])
+    assert quiet["decision"] == "silent" and quiet["risk_level"] == "low" and quiet["pause_kind"] is None
+    scam = run(script["refund"], "refund_mistake")
+    assert scam["decision"] == "pause" and scam["pause_kind"] == "scam" and scam["risk_level"] == "high"
+    assert scam["details"]["llm"]["residency"] == "internal_only" and not scam["details"]["llm"]["used"]
+    assert run(script["bill_risk"])["decision"] == "ask_purpose"
+    bill = run(script["bill_risk"], "friend")
+    assert bill["decision"] == "pause" and bill["pause_kind"] == "bill" and bill["risk_level"] == "medium"
+    assert [r["code"] for r in bill["reasons"]] == ["bill_shortfall"]
+    assert not bill["details"]["flags"]["behaviour"] and not bill["details"]["flags"]["rules"]
+    for scripted in ("D0002", "D0003", "D0004"):
+        rows = client.get("/demo/script", params={"customer_id": scripted}, headers=headers).json()
+        assert rows and all(row["expected"] == row["kind"] for row in rows)
+
+
+def test_experiment_metrics_count_only_material_payments():
+    import pandas as pd
+
+    from ml import experiments
+
+    table = pd.DataFrame({"is_scam": [1, 1, 1, 0, 0, 0], "amount": [5000, 4000, 100, 900, 800, 50],
+                          "customer_id": ["a", "a", "b", "b", "c", "c"]})
+    flagged = pd.Series([True, False, True, True, False, True]).to_numpy()
+    result = experiments.at_threshold(table, flagged, customers=3)
+    assert result["scams_caught"] == 1 and result["scam_payments"] == 3 and result["false_pauses"] == 1
+    assert result["recall"] == 0.3333 and result["precision"] == 0.5
+    assert result["false_pauses_per_customer_month"] == 0.3333
+    assert sum(len(v) for v in experiments.GROUPS.values()) == 23
+    assert set(f for v in experiments.GROUPS.values() for f in v) - {"log_amount"} == set(experiments.RISK_FEATURES)
+
+
+def test_evidence_files_are_labelled_and_complete():
+    from api.monitor import evidence
+
+    experiments = evidence("experiments")
+    if experiments is None:
+        pytest.skip("run python -m ml.experiments first")
+    assert experiments["label"] == "Synthetic evaluation"
+    assert {r["model"] for r in experiments["comparison"]["rows"]} >= {"Logistic regression", "Random forest", "LightGBM", "Isolation Forest"}
+    assert "Not measured" in experiments["system_ablation"]["scam_number_reputation"]
+    assert experiments["calibration"]["brier_calibrated"] <= experiments["calibration"]["brier_always_base_rate"]
+    metrics = evidence("metrics")
+    assert metrics and 0 < metrics["friction"]["no_interruption"] <= 1
+    reference = evidence("reference")
+    assert reference and abs(sum(reference["score_shares"]) - 1) < 1e-3
+    load = evidence("load_test")
+    if load:
+        assert load["tool"] == "Locust" and load["requests"] > 0 and "one machine" in load["environment"]
+
+
+def test_unreachable_postgres_falls_back_to_sqlite(tmp_path, monkeypatch):
+    from api.db import Database
+
+    monkeypatch.setenv("THAMUN_DB_PATH", str(tmp_path / "fallback.db"))
+    db = Database("postgresql+pg8000://nobody:wrong@127.0.0.1:1/none")
+    assert db.fallback and db.backend == "sqlite" and db.healthy()
+    db.audit("check", "s", "D0001", decision="silent")
