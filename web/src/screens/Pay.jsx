@@ -52,7 +52,7 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
     }
     let stopped = false
     api.checkNumber(customerId, typed, lang)
-      .then((data) => !stopped && setWarn(data.reports > 0 ? data.reports : null))
+      .then((data) => !stopped && setWarn(data.reports > 0 ? { n: data.reports, soft: data.confidence === 'low' } : null))
       .catch(() => !stopped && setWarn(null))
     return () => {
       stopped = true
@@ -312,7 +312,12 @@ export default function Pay({ customerId, lang, t, home, preset, onPresetUsed, o
               onChange={(e) => { setNumber(e.target.value); setTarget(null) }} />
           </label>
         )}
-        {FREE_ENTRY[type] && warn && <p className="number-warn" role="status">{warn === 1 ? t('reportedWarnOne') : t('reportedWarn', { n: warn })}</p>}
+        {FREE_ENTRY[type] && warn && (
+          <p className={`number-warn ${warn.soft ? 'soft' : ''}`} role="status">
+            {warn.soft ? (warn.n === 1 ? t('reportedSoftOne') : t('reportedSoft', { n: warn.n }))
+              : (warn.n === 1 ? t('reportedWarnOne') : t('reportedWarn', { n: warn.n }))}
+          </p>
+        )}
         {list.length > 0 && <div className="list-label">{t('saved')}</div>}
         {book && list.length === 0 && !FREE_ENTRY[type] && <p className="muted">{t('noPayees')}</p>}
         <ul className="rows pick">

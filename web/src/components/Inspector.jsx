@@ -2,7 +2,7 @@ import { day, percent, taka } from '../format'
 import Icon from './Icon'
 
 const RULES = {
-  reported_number: 'The number is on the reported list. This pauses any amount and skips the purpose question.',
+  reported_number: 'Several different customers reported this number (medium or high confidence). This pauses any amount and skips the purpose question.',
   refund_no_incoming: 'Refund claimed, but nothing was received from this number in the last 72 hours.',
   refund_exceeds_incoming: 'Refund claimed for more than was received.',
   prize_fee: 'Stated purpose is a fee for a prize or offer.',
@@ -126,7 +126,7 @@ export default function Inspector({ check, metrics, onClose }) {
                 {d.reported && (
                   <p className="side-note">
                     Community reports: {d.reported.reports === 0 ? 'none for this number.'
-                      : `${d.reported.reports} (${d.reported.from_list} from the dummy list, ${d.reported.from_session} added in this browser session).`}
+                      : `${d.reported.reports} reporters, ${d.reported.recent_reports} in the last 30 days, score ${d.reported.score}, confidence ${d.reported.confidence}. ${d.reported.confidence === 'low' ? 'Below the pause level, so it only adds a caution.' : ''}`}
                   </p>
                 )}
                 {d.affordability ? (

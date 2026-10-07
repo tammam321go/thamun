@@ -169,6 +169,12 @@ h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
 .verdict-card.reported { background: var(--red-soft); border-color: #EBCFCA; border-left-color: var(--red); }
 .verdict-card.unknown { background: var(--amber-soft); border-color: #F0DDBB; border-left-color: var(--amber); }
 .verdict-card.known { background: var(--green-soft); border-color: #C9E4D5; border-left-color: var(--green); }
+.verdict-card.unconfirmed { background: var(--amber-soft); border-color: #F0DDBB; border-left-color: var(--amber); }
+.verdict-card.unconfirmed h2 { color: var(--amber); }
+.verdict-card > .pill { align-self: flex-start; }
+.pill.conf-low { background: var(--amber-soft); color: var(--amber); border: 1px solid #F0DDBB; }
+.pill.conf-medium, .pill.conf-high { background: var(--red-soft); color: var(--red); }
+.number-warn.soft { background: var(--amber-soft); border-left-color: var(--amber); color: #7A4C08; }
 .verdict-card h2 { margin: 0; font-size: 19px; }
 .verdict-card.reported h2 { color: var(--red-deep); }
 .verdict-card.unknown h2 { color: var(--amber); }

@@ -4,7 +4,7 @@ import { api } from '../api'
 export default function ReportBox({ customerId, number, lang, t, options, already, onDone }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [count, setCount] = useState(null)
+  const [done, setDone] = useState(null)
   const [error, setError] = useState('')
 
   const send = async (pattern) => {
@@ -12,7 +12,7 @@ export default function ReportBox({ customerId, number, lang, t, options, alread
     setError('')
     try {
       const data = await api.report({ customer_id: customerId, number, pattern, lang })
-      setCount(data.reports)
+      setDone(data)
       if (onDone) onDone(data)
     } catch (e) {
       setError(e.message)
@@ -20,8 +20,11 @@ export default function ReportBox({ customerId, number, lang, t, options, alread
     setBusy(false)
   }
 
-  if (count !== null) {
-    return <p className="report-done" role="status">{count <= 1 ? t('reportThanksOne') : t('reportThanks', { count })}</p>
+  if (done) {
+    const strong = done.confidence === 'medium' || done.confidence === 'high'
+    const text = strong ? t('reportThanks', { count: done.reports })
+      : done.reports <= 1 ? t('reportThanksOne') : t('reportThanksFew', { count: done.reports })
+    return <p className="report-done" role="status">{text}</p>
   }
   if (already) return <p className="report-done">{t('reportedByYou')}</p>
 

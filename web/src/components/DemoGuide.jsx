@@ -12,7 +12,8 @@ const COPY = {
   takeover: { title: 'Cash out almost everything at an unknown agent', expect: 'Pauses on behaviour alone. This is what an account takeover looks like.' },
   friend: { title: 'Send the usual amount to a regular contact', expect: 'Silent. Known person, normal amount.' },
   reported_small: { title: 'Send a tiny amount to a reported number', expect: 'Pauses at once, even for ৳50. The red page starts with how many people reported the number.' },
-  reported_usual: { title: 'Send a normal amount to a reported number', expect: 'Pauses without asking the purpose. A reported number pauses any amount.' },
+  reported_usual: { title: 'Send a normal amount to a reported number', expect: 'Pauses without asking the purpose. A number confirmed by many reporters pauses any amount.' },
+  reported_once: { title: 'Send to a number with a single report', expect: 'Nudge, not a pause. One report is not proof, so Thamun shows a caution and lets the payment continue.' },
 }
 
 const PERSONA = {
@@ -39,9 +40,9 @@ export default function DemoGuide({ customer, customerId, version, onRun, onGo, 
     <li key={s.id}>
       <div className="step-top">
         <span className="step-title">{(COPY[s.id] || {}).title}</span>
-        <span className={`pill kind-${s.kind}`}>{s.kind}</span>
+        <span className={`pill kind-${s.expected || s.kind}`}>{s.expected || s.kind}</span>
       </div>
-      <p>{(COPY[s.id] || {}).expect}{s.reports ? ` ${s.counterparty} has ${s.reports} reports.` : ''}</p>
+      <p>{(COPY[s.id] || {}).expect}{s.reports ? ` ${s.counterparty} has ${s.reports} ${s.reports === 1 ? 'report' : 'reports'} (${s.confidence} confidence).` : ''}</p>
       <button className="btn small" onClick={() => onRun(s)}>Run with {taka(s.amount)}</button>
     </li>
   )
@@ -63,12 +64,12 @@ export default function DemoGuide({ customer, customerId, version, onRun, onGo, 
       <ol className="steps">
         {script.filter((s) => s.reports).map(step)}
       </ol>
-      <p className="side-note">Reported numbers. Press Send, type any amount and continue: Thamun pauses and shows how many people reported the number. Check opens the number in the Check tab. A number you report from the red page or the Check tab is added to this list.</p>
+      <p className="side-note">Reported numbers, kept in the database. Confidence comes from how many different customers reported a number and how recently. Medium and high pause any amount. Low only shows a caution. Report a new number as three different demo customers to watch it move from low to medium.</p>
       <ul className="guide-list">
         {reported.map((r) => (
           <li key={r.number}>
             <code>{r.number}</code>
-            <span>{r.reports} {r.reports === 1 ? 'report' : 'reports'}</span>
+            <span>{r.reports} {r.reports === 1 ? 'report' : 'reports'} · {r.confidence}</span>
             <span className="guide-actions">
               <button className="link" onClick={() => onSendTo(r.number)}>Send</button>
               <button className="link" onClick={() => onCheckNumber(r.number)}>Check</button>

@@ -99,7 +99,7 @@ export default function Check({ customerId, lang, t, preset, version, onChanged,
     setReportError('')
     try {
       const result = await api.report({ customer_id: customerId, number: target.trim(), pattern, lang })
-      setOutcome({ added: result.added, reports: result.reports, number: result.number })
+      setOutcome({ added: result.added, reports: result.reports, number: result.number, confidence: result.confidence })
       setChoosing(false)
       setTarget('')
       setNumber(result.number)
@@ -111,8 +111,10 @@ export default function Check({ customerId, lang, t, preset, version, onChanged,
     setSending(false)
   }
 
+  const strong = (level) => level === 'medium' || level === 'high'
   const thanks = outcome && (!outcome.added ? t('reportedByYou')
-    : outcome.reports <= 1 ? t('reportThanksOne') : t('reportThanks', { count: outcome.reports }))
+    : strong(outcome.confidence) ? t('reportThanks', { count: outcome.reports })
+      : outcome.reports <= 1 ? t('reportThanksOne') : t('reportThanksFew', { count: outcome.reports }))
 
   return (
     <div className="pad stack">
@@ -137,6 +139,7 @@ export default function Check({ customerId, lang, t, preset, version, onChanged,
           {data.reports > 0 && (
             <div className="verdict-count">{data.reports}<small>{data.reports === 1 ? t('reportWord') : t('reportsWord')}</small></div>
           )}
+          {data.reports > 0 && data.confidence && <span className={`pill conf-${data.confidence}`}>{t(`conf_${data.confidence}`)}</span>}
           <h2>{data.headline}</h2>
           <ul className="plain">
             {data.lines.map((line) => <li key={line}>{line}</li>)}
@@ -179,7 +182,7 @@ export default function Check({ customerId, lang, t, preset, version, onChanged,
             <li key={row.number}>
               <button type="button" onClick={() => pick(row.number)}>
                 <span className="row-title">{row.number}</span>
-                <span className="pill short">{t(row.reports === 1 ? 'reportsOne' : 'reportsN', { n: row.reports })}</span>
+                <span className={`pill conf-${row.confidence || 'high'}`}>{t(row.reports === 1 ? 'reportsOne' : 'reportsN', { n: row.reports })}</span>
               </button>
             </li>
           ))}

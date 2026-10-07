@@ -13,11 +13,64 @@ function sessionId() {
   }
 }
 
-async function request(path, options = {}) {
-  const response = await fetch(BASE + path, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', 'X-Session': sessionId() },
-  })
+let token = null
+let tokenless = false
+let starting = null
+
+function remembered() {
+  try {
+    return localStorage.getItem('thamun-token')
+  } catch {
+    return null
+  }
+}
+
+function remember(value) {
+  token = value
+  try {
+    if (value) localStorage.setItem('thamun-token', value)
+    else localStorage.removeItem('thamun-token')
+  } catch {
+    return
+  }
+}
+
+function startSession() {
+  if (!starting) {
+    starting = fetch(BASE + '/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(async (response) => {
+        if (response.status === 404) {
+          tokenless = true
+          return null
+        }
+        if (!response.ok) throw new Error('The session could not be started.')
+        const data = await response.json()
+        remember(data.access_token)
+        return data.access_token
+      })
+      .finally(() => {
+        starting = null
+      })
+  }
+  return starting
+}
+
+async function bearer() {
+  if (tokenless) return null
+  if (!token) token = remembered()
+  return token || startSession()
+}
+
+async function request(path, options = {}, retried = false) {
+  const headers = { 'Content-Type': 'application/json', 'X-Session': sessionId() }
+  const current = await bearer()
+  if (current) headers.Authorization = `Bearer ${current}`
+  const response = await fetch(BASE + path, { ...options, headers })
+  if (response.status === 401 && !retried) {
+    remember(null)
+    await startSession()
+    return request(path, options, true)
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok) {
     const detail = data && data.detail
@@ -55,4 +108,9 @@ export const api = {
   report: (body) => post('/reports', body),
   reset: (customer_id) => post('/demo/reset', customer_id ? { customer_id } : {}),
   metrics: () => get('/metrics'),
+  evidence: () => get('/evidence'),
+  analytics: (scope) => get('/analytics', { scope }),
+  monitoring: () => get('/monitoring'),
+  feedback: (body) => post('/feedback', body),
+  feedbackSummary: () => get('/feedback/summary'),
 }
