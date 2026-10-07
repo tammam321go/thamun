@@ -1,0 +1,161 @@
+{
+  "test_month": "2026-09",
+  "customers": 200,
+  "labels": {
+    "test_payments": 9178,
+    "accuracy": 0.9616,
+    "auto_label_share": 0.9557,
+    "auto_label_accuracy": 0.9713,
+    "asked_share": 0.027,
+    "not_asked_share": 0.973
+  },
+  "guard": {
+    "scam_payments": 54,
+    "scam_incidents": 39,
+    "recall_payments": 0.963,
+    "recall_payments_interval": [
+      0.8746,
+      0.9898
+    ],
+    "recall_first_payment": 0.9487,
+    "recall_incidents_any": 0.9487,
+    "recall_money": 0.8889,
+    "recall_model_only": 0.963,
+    "recall_rules_only": 0.5556,
+    "false_pauses_per_customer_month": 0.575,
+    "affordability_pauses_per_customer_month": 0.295,
+    "all_pauses_per_customer_month": 1.13,
+    "pause_precision": 0.3114
+  },
+  "friction": {
+    "legit_paused": 0.0191,
+    "payments": 9178,
+    "silent": 0.9225,
+    "nudge": 0.0528,
+    "pause": 0.0246,
+    "asked_purpose": 0.027,
+    "no_interruption": 0.91
+  },
+  "guard_by_scam_type": {
+    "account_takeover": {
+      "payments": 5,
+      "paused": 1.0
+    },
+    "fake_agent_call": {
+      "payments": 4,
+      "paused": 1.0
+    },
+    "impersonation": {
+      "payments": 4,
+      "paused": 0.5
+    },
+    "prize_fee": {
+      "payments": 18,
+      "paused": 1.0
+    },
+    "refund_scam": {
+      "payments": 23,
+      "paused": 1.0
+    }
+  },
+  "guard_by_persona": {
+    "irregular": {
+      "scam_payments": 19,
+      "scam_incidents": 12,
+      "recall_payments": 1.0,
+      "recall_payments_interval": [
+        0.8318,
+        1.0
+      ],
+      "recall_first_payment": 1.0,
+      "recall_incidents_any": 1.0,
+      "recall_money": 1.0,
+      "recall_model_only": 1.0,
+      "recall_rules_only": 0.4211,
+      "false_pauses_per_customer_month": 0.25,
+      "affordability_pauses_per_customer_month": 0.0,
+      "all_pauses_per_customer_month": 0.725,
+      "pause_precision": 0.6552
+    },
+    "salaried": {
+      "scam_payments": 21,
+      "scam_incidents": 16,
+      "recall_payments": 0.9524,
+      "recall_payments_interval": [
+        0.7733,
+        0.9915
+      ],
+      "recall_first_payment": 0.9375,
+      "recall_incidents_any": 0.9375,
+      "recall_money": 0.9788,
+      "recall_model_only": 0.9524,
+      "recall_rules_only": 0.5714,
+      "false_pauses_per_customer_month": 0.6625,
+      "affordability_pauses_per_customer_month": 0.475,
+      "all_pauses_per_customer_month": 1.3875,
+      "pause_precision": 0.274
+    },
+    "shop_owner": {
+      "scam_payments": 7,
+      "scam_incidents": 7,
+      "recall_payments": 0.8571,
+      "recall_payments_interval": [
+        0.4869,
+        0.9743
+      ],
+      "recall_first_payment": 0.8571,
+      "recall_incidents_any": 0.8571,
+      "recall_money": 0.7525,
+      "recall_model_only": 0.8571,
+      "recall_rules_only": 0.5714,
+      "false_pauses_per_customer_month": 0.6667,
+      "affordability_pauses_per_customer_month": 0.5667,
+      "all_pauses_per_customer_month": 1.4333,
+      "pause_precision": 0.2308
+    },
+    "student": {
+      "scam_payments": 7,
+      "scam_incidents": 4,
+      "recall_payments": 1.0,
+      "recall_payments_interval": [
+        0.6457,
+        1.0
+      ],
+      "recall_first_payment": 1.0,
+      "recall_incidents_any": 1.0,
+      "recall_money": 1.0,
+      "recall_model_only": 1.0,
+      "recall_rules_only": 0.8571,
+      "false_pauses_per_customer_month": 0.64,
+      "affordability_pauses_per_customer_month": 0.08,
+      "all_pauses_per_customer_month": 0.86,
+      "pause_precision": 0.1795
+    }
+  },
+  "unusual_legit_paused_share": 0.3091,
+  "bills": {
+    "recurring_truth": 442,
+    "detection_recall": 0.9887,
+    "detection_precision": 0.9954,
+    "test_bills": 354,
+    "due_date_mae_days": 0.35,
+    "amount_mape": 0.028,
+    "shortfalls": 110,
+    "shortfall_recall_3_days_ahead": 0.7455,
+    "shortfall_precision": 0.5655
+  },
+  "nudges": {
+    "spending_nudges": 290,
+    "spending_nudges_per_customer_month": 1.45,
+    "bill_nudges_per_customer_month": 1.0,
+    "precision_truly_above_usual": 0.8897,
+    "clear_overspend_weeks": 399,
+    "clear_overspend_weeks_nudged": 0.5088,
+    "max_per_customer_week": 2
+  },
+  "thresholds": {
+    "risk": 0.03700283059364816,
+    "isolation": 0.7849468733926772,
+    "label_confidence": 0.9
+  }
+}

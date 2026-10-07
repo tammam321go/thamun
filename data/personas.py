@@ -115,6 +115,9 @@ CATEGORY_PURPOSE = {
 
 SCAM_TYPES = ["refund_scam", "prize_fee", "fake_agent_call", "account_takeover", "impersonation"]
 
+MODEST_SCAM_SHARE = 0.3
+PURPOSE_HONESTY_SCALE = 1.0
+
 SCAM_PURPOSE = {
     "refund_scam": ("refund_mistake", 0.75),
     "prize_fee": ("prize_fee", 0.65),

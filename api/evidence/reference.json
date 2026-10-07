@@ -1,0 +1,22 @@
+{
+  "source": "test month of the synthetic data",
+  "payments": 9178,
+  "score_edges": [
+    0.001,
+    0.005,
+    0.02,
+    0.05,
+    0.2,
+    0.5
+  ],
+  "score_shares": [
+    0.93637,
+    0.035193,
+    0.01046,
+    0.003051,
+    0.004467,
+    0.003378,
+    0.007082
+  ],
+  "high_risk_share": 0.0183
+}

@@ -422,7 +422,7 @@ class Simulator:
 
     def scam_purpose(self, scam_type):
         story, honesty = P.SCAM_PURPOSE[scam_type]
-        if story and self.rng.random() < honesty:
+        if story and self.rng.random() < honesty * P.PURPOSE_HONESTY_SCALE:
             return story
         return str(self.rng.choice(["friend", "family_support", "purchase", "other"]))
 
@@ -437,7 +437,7 @@ class Simulator:
         small = p["persona"] in ("student", "irregular")
         scammer = phone(rng)
         typical = next((l["median"] for l in p["spend"] if l["type"] == "send_money"), 800.0)
-        modest = rng.random() < 0.3
+        modest = rng.random() < P.MODEST_SCAM_SHARE
         out = []
         if scam_type == "refund_scam":
             t = at(d, int(rng.integers(9, 22)), rng)
@@ -566,7 +566,8 @@ def frame(rows):
     return df[COLUMNS]
 
 
-def generate(seed=P.SEED, scale=1.0, quiet=False, demo=False):
+def generate(seed=P.SEED, scale=1.0, quiet=False, demo=False, out_dir=None):
+    out_dir = Path(out_dir) if out_dir else OUT_DIR
     registry = build_registry(np.random.default_rng([seed, 0]))
     customers, rows, bill_events, splurges, truth, usual = [], [], [], [], [], []
     idx = 0
@@ -590,21 +591,21 @@ def generate(seed=P.SEED, scale=1.0, quiet=False, demo=False):
             for cat, value in weekly.items():
                 usual.append({"customer_id": profile["customer_id"], "category": cat, "weekly_mean": round(value, 1)})
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     txns = frame(rows)
-    txns.to_csv(OUT_DIR / "transactions.csv", index=False)
-    pd.DataFrame(customers).to_csv(OUT_DIR / "customers.csv", index=False)
-    pd.DataFrame(bill_events).to_csv(OUT_DIR / "bill_events.csv", index=False)
-    pd.DataFrame(splurges).to_csv(OUT_DIR / "splurges.csv", index=False)
-    pd.DataFrame(truth).to_csv(OUT_DIR / "recurring_truth.csv", index=False)
-    pd.DataFrame(usual).to_csv(OUT_DIR / "spend_truth.csv", index=False)
+    txns.to_csv(out_dir / "transactions.csv", index=False)
+    pd.DataFrame(customers).to_csv(out_dir / "customers.csv", index=False)
+    pd.DataFrame(bill_events).to_csv(out_dir / "bill_events.csv", index=False)
+    pd.DataFrame(splurges).to_csv(out_dir / "splurges.csv", index=False)
+    pd.DataFrame(truth).to_csv(out_dir / "recurring_truth.csv", index=False)
+    pd.DataFrame(usual).to_csv(out_dir / "spend_truth.csv", index=False)
 
     if not quiet:
         out = txns[txns.direction == "out"]
         print(f"customers: {len(customers)}  transactions: {len(txns)}  outgoing: {len(out)}")
         print(f"scam transactions: {int(out.is_scam.sum())}  incidents: {out[out.is_scam == 1].incident_id.nunique()}")
         print(out.groupby("persona").agg(txns=("amount", "size"), scams=("is_scam", "sum")).to_string())
-    if not demo and (DEMO_DIR / "transactions.csv").exists():
+    if out_dir != OUT_DIR or (not demo and (DEMO_DIR / "transactions.csv").exists()):
         return txns
 
     demo_rows, demo_customers, demo_contacts = [], [], {}

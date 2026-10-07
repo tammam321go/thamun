@@ -1,0 +1,625 @@
+{
+  "generated_at": "2026-10-07T10:00:07",
+  "label": "Synthetic evaluation",
+  "data": {
+    "test_month": "2026-09",
+    "test_payments": 9178,
+    "test_scam_payments": 54,
+    "customers": 200
+  },
+  "comparison": {
+    "protocol": "Fit on April to July, choose the threshold on August so that every model is allowed the same number of false pauses, refit on April to August, score September once.",
+    "false_pause_budget_per_customer_month": 0.48,
+    "rows": [
+      {
+        "model": "Logistic regression",
+        "kind": "supervised baseline",
+        "pr_auc": 0.5668,
+        "roc_auc": 0.9946,
+        "scams_at_equal_budget": 45,
+        "recall_at_equal_budget": 0.8333,
+        "brier": 0.01921,
+        "scams_caught": 45,
+        "scam_payments": 54,
+        "recall": 0.8333,
+        "recall_interval": [
+          0.7126,
+          0.9098
+        ],
+        "precision": 0.3237,
+        "f1": 0.4663,
+        "false_pauses": 94,
+        "false_pauses_per_customer_month": 0.47,
+        "train_seconds": 1.5,
+        "ms_per_payment": 3.46,
+        "size_kb": 5
+      },
+      {
+        "model": "Random forest",
+        "kind": "supervised baseline",
+        "pr_auc": 0.6967,
+        "roc_auc": 0.9976,
+        "scams_at_equal_budget": 52,
+        "recall_at_equal_budget": 0.963,
+        "brier": 0.00283,
+        "scams_caught": 52,
+        "scam_payments": 54,
+        "recall": 0.963,
+        "recall_interval": [
+          0.8746,
+          0.9898
+        ],
+        "precision": 0.3421,
+        "f1": 0.5049,
+        "false_pauses": 100,
+        "false_pauses_per_customer_month": 0.5,
+        "train_seconds": 8.7,
+        "ms_per_payment": 57.13,
+        "size_kb": 8302
+      },
+      {
+        "model": "LightGBM",
+        "kind": "supervised, used in Thamun",
+        "pr_auc": 0.7192,
+        "roc_auc": 0.9971,
+        "scams_at_equal_budget": 53,
+        "recall_at_equal_budget": 0.9815,
+        "brier": 0.00352,
+        "scams_caught": 53,
+        "scam_payments": 54,
+        "recall": 0.9815,
+        "recall_interval": [
+          0.9023,
+          0.9967
+        ],
+        "precision": 0.3212,
+        "f1": 0.484,
+        "false_pauses": 112,
+        "false_pauses_per_customer_month": 0.56,
+        "train_seconds": 1.1,
+        "ms_per_payment": 0.26,
+        "size_kb": 314
+      },
+      {
+        "model": "Isolation Forest",
+        "kind": "unsupervised, never sees a scam label",
+        "pr_auc": 0.0119,
+        "roc_auc": 0.7385,
+        "scams_at_equal_budget": 1,
+        "recall_at_equal_budget": 0.0185,
+        "brier": null,
+        "scams_caught": 1,
+        "scam_payments": 54,
+        "recall": 0.0185,
+        "recall_interval": [
+          0.0033,
+          0.0977
+        ],
+        "precision": 0.0093,
+        "f1": 0.0124,
+        "false_pauses": 106,
+        "false_pauses_per_customer_month": 0.53,
+        "train_seconds": 0.9,
+        "ms_per_payment": 8.68,
+        "size_kb": 3446
+      },
+      {
+        "model": "LightGBM + Isolation Forest",
+        "kind": "behaviour model in production",
+        "pr_auc": null,
+        "roc_auc": null,
+        "scams_at_equal_budget": null,
+        "recall_at_equal_budget": null,
+        "brier": null,
+        "scams_caught": 52,
+        "scam_payments": 54,
+        "recall": 0.963,
+        "recall_interval": [
+          0.8746,
+          0.9898
+        ],
+        "precision": 0.3114,
+        "f1": 0.4706,
+        "false_pauses": 115,
+        "false_pauses_per_customer_month": 0.575,
+        "train_seconds": null,
+        "ms_per_payment": null,
+        "size_kb": null
+      }
+    ],
+    "thresholds": {
+      "lightgbm": 0.037,
+      "isolation": 0.7849
+    },
+    "isolation_only_flags": {
+      "scams": 0,
+      "legit": 23
+    }
+  },
+  "calibration": {
+    "method": "Isotonic regression fitted on the validation month, applied to the test month.",
+    "base_rate_test": 0.00588,
+    "brier_raw": 0.00352,
+    "brier_calibrated": 0.00299,
+    "brier_always_base_rate": 0.00585,
+    "expected_calibration_error_raw": 0.00257,
+    "expected_calibration_error_calibrated": 0.00126,
+    "raw": [
+      {
+        "range": "0.00 to 0.01",
+        "payments": 8980,
+        "mean_predicted": 0.0002,
+        "observed_scam_rate": 0.0001
+      },
+      {
+        "range": "0.01 to 0.05",
+        "payments": 61,
+        "mean_predicted": 0.022,
+        "observed_scam_rate": 0.0164
+      },
+      {
+        "range": "0.05 to 0.20",
+        "payments": 41,
+        "mean_predicted": 0.1084,
+        "observed_scam_rate": 0.1707
+      },
+      {
+        "range": "0.20 to 0.50",
+        "payments": 31,
+        "mean_predicted": 0.3431,
+        "observed_scam_rate": 0.3226
+      },
+      {
+        "range": "0.50 to 1.00",
+        "payments": 65,
+        "mean_predicted": 0.8332,
+        "observed_scam_rate": 0.5385
+      }
+    ],
+    "calibrated": [
+      {
+        "range": "0.00 to 0.01",
+        "payments": 8950,
+        "mean_predicted": 0.0002,
+        "observed_scam_rate": 0.0001
+      },
+      {
+        "range": "0.01 to 0.05",
+        "payments": 79,
+        "mean_predicted": 0.0165,
+        "observed_scam_rate": 0.0127
+      },
+      {
+        "range": "0.05 to 0.20",
+        "payments": 57,
+        "mean_predicted": 0.1218,
+        "observed_scam_rate": 0.1228
+      },
+      {
+        "range": "0.20 to 0.50",
+        "payments": 47,
+        "mean_predicted": 0.3362,
+        "observed_scam_rate": 0.2766
+      },
+      {
+        "range": "0.50 to 1.00",
+        "payments": 45,
+        "mean_predicted": 0.8886,
+        "observed_scam_rate": 0.7111
+      }
+    ],
+    "note": "Thamun decides with a threshold on the ranking, so calibration does not change any decision. The probabilities reflect the scam rate of the simulator, which is far above real life."
+  },
+  "feature_ablation": {
+    "model": "LightGBM alone with the same parameters in every row. Scams caught are counted with each model allowed exactly 0.48 false pauses per customer in the test month, so rows are comparable",
+    "cumulative": [
+      {
+        "step": "Only Raw payment fields (amount, type, recipient type)",
+        "group": "payment_fields",
+        "features": 3,
+        "scam_payments": 54,
+        "pr_auc": 0.0586,
+        "roc_auc": 0.9519,
+        "scams_at_equal_budget": 0,
+        "recall_at_equal_budget": 0.0
+      },
+      {
+        "step": "+ Amount compared with the customer's own history",
+        "group": "amount_vs_own_history",
+        "features": 8,
+        "scam_payments": 54,
+        "pr_auc": 0.0707,
+        "roc_auc": 0.957,
+        "scams_at_equal_budget": 4,
+        "recall_at_equal_budget": 0.0741
+      },
+      {
+        "step": "+ Recipient history",
+        "group": "recipient_history",
+        "features": 12,
+        "scam_payments": 54,
+        "pr_auc": 0.4747,
+        "roc_auc": 0.9857,
+        "scams_at_equal_budget": 36,
+        "recall_at_equal_budget": 0.6667
+      },
+      {
+        "step": "+ Share of balance",
+        "group": "balance_impact",
+        "features": 13,
+        "scam_payments": 54,
+        "pr_auc": 0.676,
+        "roc_auc": 0.9954,
+        "scams_at_equal_budget": 44,
+        "recall_at_equal_budget": 0.8148
+      },
+      {
+        "step": "+ Time of day",
+        "group": "timing",
+        "features": 16,
+        "scam_payments": 54,
+        "pr_auc": 0.6451,
+        "roc_auc": 0.9949,
+        "scams_at_equal_budget": 42,
+        "recall_at_equal_budget": 0.7778
+      },
+      {
+        "step": "+ Speed and sequence in the last hour and day",
+        "group": "velocity",
+        "features": 23,
+        "scam_payments": 54,
+        "pr_auc": 0.7196,
+        "roc_auc": 0.9972,
+        "scams_at_equal_budget": 51,
+        "recall_at_equal_budget": 0.9444
+      }
+    ],
+    "production_set": {
+      "features": 22,
+      "scam_payments": 54,
+      "pr_auc": 0.7192,
+      "roc_auc": 0.9971,
+      "scams_at_equal_budget": 53,
+      "recall_at_equal_budget": 0.9815
+    },
+    "leave_one_group_out": [
+      {
+        "removed": "Amount compared with the customer's own history",
+        "group": "amount_vs_own_history",
+        "features": 17,
+        "scam_payments": 54,
+        "pr_auc": 0.75,
+        "roc_auc": 0.997,
+        "scams_at_equal_budget": 52,
+        "recall_at_equal_budget": 0.963,
+        "pr_auc_change": 0.0308,
+        "scams_change": -1
+      },
+      {
+        "removed": "Recipient history",
+        "group": "recipient_history",
+        "features": 18,
+        "scam_payments": 54,
+        "pr_auc": 0.5215,
+        "roc_auc": 0.9852,
+        "scams_at_equal_budget": 34,
+        "recall_at_equal_budget": 0.6296,
+        "pr_auc_change": -0.1977,
+        "scams_change": -19
+      },
+      {
+        "removed": "Share of balance",
+        "group": "balance_impact",
+        "features": 21,
+        "scam_payments": 54,
+        "pr_auc": 0.5504,
+        "roc_auc": 0.9852,
+        "scams_at_equal_budget": 46,
+        "recall_at_equal_budget": 0.8519,
+        "pr_auc_change": -0.1688,
+        "scams_change": -7
+      },
+      {
+        "removed": "Time of day",
+        "group": "timing",
+        "features": 19,
+        "scam_payments": 54,
+        "pr_auc": 0.6953,
+        "roc_auc": 0.9963,
+        "scams_at_equal_budget": 48,
+        "recall_at_equal_budget": 0.8889,
+        "pr_auc_change": -0.0239,
+        "scams_change": -5
+      },
+      {
+        "removed": "Speed and sequence in the last hour and day",
+        "group": "velocity",
+        "features": 15,
+        "scam_payments": 54,
+        "pr_auc": 0.6458,
+        "roc_auc": 0.9957,
+        "scams_at_equal_budget": 46,
+        "recall_at_equal_budget": 0.8519,
+        "pr_auc_change": -0.0734,
+        "scams_change": -7
+      }
+    ]
+  },
+  "unseen_scam_types": {
+    "method": "For each scam type, every scam of that type is removed from training and validation, so the model has never seen it. The table shows how many September payments of that type are still caught.",
+    "rows": [
+      {
+        "scam_type": "account_takeover",
+        "payments": 5,
+        "caught_by_lightgbm": 2,
+        "caught_with_isolation_forest": 2,
+        "added_by_isolation_forest": 0,
+        "recall_lightgbm": 0.4,
+        "recall_combined": 0.4
+      },
+      {
+        "scam_type": "fake_agent_call",
+        "payments": 4,
+        "caught_by_lightgbm": 4,
+        "caught_with_isolation_forest": 4,
+        "added_by_isolation_forest": 0,
+        "recall_lightgbm": 1.0,
+        "recall_combined": 1.0
+      },
+      {
+        "scam_type": "impersonation",
+        "payments": 4,
+        "caught_by_lightgbm": 0,
+        "caught_with_isolation_forest": 0,
+        "added_by_isolation_forest": 0,
+        "recall_lightgbm": 0.0,
+        "recall_combined": 0.0
+      },
+      {
+        "scam_type": "prize_fee",
+        "payments": 18,
+        "caught_by_lightgbm": 18,
+        "caught_with_isolation_forest": 18,
+        "added_by_isolation_forest": 0,
+        "recall_lightgbm": 1.0,
+        "recall_combined": 1.0
+      },
+      {
+        "scam_type": "refund_scam",
+        "payments": 23,
+        "caught_by_lightgbm": 22,
+        "caught_with_isolation_forest": 22,
+        "added_by_isolation_forest": 0,
+        "recall_lightgbm": 0.9565,
+        "recall_combined": 0.9565
+      }
+    ],
+    "overall_lightgbm": 0.8519,
+    "overall_combined": 0.8519,
+    "added_by_isolation_forest": 0
+  },
+  "importance": {
+    "method": "Mean absolute SHAP value over every payment in the test month (LightGBM tree SHAP).",
+    "features": [
+      {
+        "feature": "type_idx",
+        "share": 0.1448
+      },
+      {
+        "feature": "cp_age_days",
+        "share": 0.1294
+      },
+      {
+        "feature": "n_out",
+        "share": 0.1287
+      },
+      {
+        "feature": "balance_share",
+        "share": 0.0837
+      },
+      {
+        "feature": "amt_ratio_max",
+        "share": 0.0804
+      },
+      {
+        "feature": "sum_1h_ratio",
+        "share": 0.072
+      },
+      {
+        "feature": "in_1h_ratio",
+        "share": 0.0571
+      },
+      {
+        "feature": "hour",
+        "share": 0.0568
+      },
+      {
+        "feature": "cp_count",
+        "share": 0.034
+      },
+      {
+        "feature": "mins_since_last",
+        "share": 0.0332
+      }
+    ],
+    "groups": {
+      "Amount compared with the customer's own history": 0.26,
+      "Speed and sequence in the last hour and day": 0.2216,
+      "Recipient history": 0.1974,
+      "Raw payment fields (amount, type, recipient type)": 0.1561,
+      "Share of balance": 0.0837,
+      "Time of day": 0.0811
+    }
+  },
+  "system_ablation": {
+    "rows": [
+      {
+        "layer": "Purpose rules alone",
+        "scams_paused": 30,
+        "scam_payments": 54,
+        "recall": 0.5556,
+        "genuine_pauses_per_customer_month": 0.0,
+        "note": "Needs the customer to answer the purpose question."
+      },
+      {
+        "layer": "Behaviour model alone (LightGBM + Isolation Forest)",
+        "scams_paused": 52,
+        "scam_payments": 54,
+        "recall": 0.963,
+        "genuine_pauses_per_customer_month": 0.575,
+        "note": ""
+      },
+      {
+        "layer": "Behaviour model + purpose rules",
+        "scams_paused": 52,
+        "scam_payments": 54,
+        "recall": 0.963,
+        "genuine_pauses_per_customer_month": 0.575,
+        "note": ""
+      },
+      {
+        "layer": "+ bill-risk pause (full Thamun decision)",
+        "scams_paused": 52,
+        "scam_payments": 54,
+        "recall": 0.963,
+        "genuine_pauses_per_customer_month": 0.87,
+        "note": "The extra pauses are affordability warnings, not scam warnings."
+      }
+    ],
+    "caught_only_by_rules": 0,
+    "caught_only_by_model": 22,
+    "caught_by_both": 30,
+    "purpose_question_share": 0.027,
+    "scam_number_reputation": "Not measured. In this simulator every scam uses a number once, so a report list cannot help by construction. Its value depends on how often real scammers reuse numbers and how many victims report, which needs real data."
+  },
+  "stress": {
+    "method": "The models and thresholds trained on the main dataset are frozen. Each row is a newly generated population that the models never saw, scored on its September. Nothing is retrained or retuned.",
+    "rows": [
+      {
+        "id": "new_customers_a",
+        "name": "New customers (seed 7)",
+        "seed": 7,
+        "scam_payments": 53,
+        "scams_paused": 49,
+        "recall": 0.9245,
+        "recall_interval": [
+          0.8214,
+          0.9703
+        ],
+        "recall_first_payment": 0.9048,
+        "recall_money": 0.9453,
+        "recall_model_only": 0.8491,
+        "recall_rules_only": 0.5094,
+        "false_pauses_per_customer_month": 0.675,
+        "no_interruption": 0.9077,
+        "seconds": 13.6
+      },
+      {
+        "id": "new_customers_b",
+        "name": "New customers (seed 101)",
+        "seed": 101,
+        "scam_payments": 74,
+        "scams_paused": 66,
+        "recall": 0.8919,
+        "recall_interval": [
+          0.8009,
+          0.9442
+        ],
+        "recall_first_payment": 0.8806,
+        "recall_money": 0.8509,
+        "recall_model_only": 0.8378,
+        "recall_rules_only": 0.473,
+        "false_pauses_per_customer_month": 0.69,
+        "no_interruption": 0.9108,
+        "seconds": 12.7
+      },
+      {
+        "id": "new_customers_c",
+        "name": "New customers (seed 2026)",
+        "seed": 2026,
+        "scam_payments": 63,
+        "scams_paused": 60,
+        "recall": 0.9524,
+        "recall_interval": [
+          0.8691,
+          0.9837
+        ],
+        "recall_first_payment": 0.9375,
+        "recall_money": 0.9945,
+        "recall_model_only": 0.9365,
+        "recall_rules_only": 0.3968,
+        "false_pauses_per_customer_month": 0.615,
+        "no_interruption": 0.9026,
+        "seconds": 12.7
+      },
+      {
+        "id": "ordinary_amounts",
+        "name": "Scammers ask for ordinary amounts (70% of scams, was 30%)",
+        "seed": 7,
+        "scam_payments": 53,
+        "scams_paused": 50,
+        "recall": 0.9434,
+        "recall_interval": [
+          0.8463,
+          0.9806
+        ],
+        "recall_first_payment": 0.9348,
+        "recall_money": 0.9625,
+        "recall_model_only": 0.8491,
+        "recall_rules_only": 0.4528,
+        "false_pauses_per_customer_month": 0.685,
+        "no_interruption": 0.9065,
+        "seconds": 11.7
+      },
+      {
+        "id": "coached_victims",
+        "name": "Victims coached to hide the purpose (honesty x 0.3)",
+        "seed": 7,
+        "scam_payments": 59,
+        "scams_paused": 54,
+        "recall": 0.9153,
+        "recall_interval": [
+          0.8165,
+          0.9633
+        ],
+        "recall_first_payment": 0.8936,
+        "recall_money": 0.9285,
+        "recall_model_only": 0.8814,
+        "recall_rules_only": 0.2203,
+        "false_pauses_per_customer_month": 0.705,
+        "no_interruption": 0.907,
+        "seconds": 11.2
+      },
+      {
+        "id": "both_shifts",
+        "name": "Both shifts together",
+        "seed": 7,
+        "scam_payments": 61,
+        "scams_paused": 55,
+        "recall": 0.9016,
+        "recall_interval": [
+          0.8016,
+          0.9541
+        ],
+        "recall_first_payment": 0.88,
+        "recall_money": 0.9149,
+        "recall_model_only": 0.8525,
+        "recall_rules_only": 0.2131,
+        "false_pauses_per_customer_month": 0.66,
+        "no_interruption": 0.9059,
+        "seconds": 12.2
+      }
+    ],
+    "new_customers_pooled": {
+      "scam_payments": 190,
+      "scams_paused": 175,
+      "recall": 0.9211,
+      "recall_interval": [
+        0.8738,
+        0.9516
+      ],
+      "false_pauses_per_customer_month": 0.66
+    }
+  },
+  "seconds": 125.3
+}

@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "out"
 MODELS = ROOT / "ml" / "models"
 DOCS = ROOT / "docs"
+EVIDENCE = ROOT / "api" / "evidence"
+SCORED = ["is_new_cp", "cp_age_days", "cp_count", "in_cp_amount", "amt_ratio_type", "confident", "high"]
 
 
 def rate(numerator, denominator):
@@ -114,30 +116,58 @@ def guard_metrics(test, customers):
     }
 
 
-def main():
-    meta = json.loads((MODELS / "meta.json").read_text())
-    txns = load_transactions(DATA / "transactions.csv")
-    table = build_table(txns)
-    cat_model = lgb.Booster(model_file=str(MODELS / categorizer.MODEL_FILE))
-    risk_model = lgb.Booster(model_file=str(MODELS / risk.MODEL_FILE))
-    iso = joblib.load(MODELS / risk.ISO_FILE)
+def friction(test):
+    total = len(test)
+    legit = test[test.is_scam == 0]
+    return {
+        "legit_paused": rate((legit.decision == "pause").sum(), len(legit)),
+        "payments": int(total),
+        "silent": rate((test.decision == "silent").sum(), total),
+        "nudge": rate((test.decision == "nudge").sum(), total),
+        "pause": rate((test.decision == "pause").sum(), total),
+        "asked_purpose": rate(test.asked.sum(), total),
+        "no_interruption": rate(((test.decision == "silent") & ~test.asked).sum(), total),
+    }
 
-    predicted, confidence = categorizer.predict_table(cat_model, table)
-    prob = risk_model.predict(table[RISK_FEATURES])
-    anomaly = risk.isolation_scores(iso, meta["risk"]["iso_scale"], table)
-    table = table.assign(
+
+def load_models(folder=MODELS):
+    folder = Path(folder)
+    meta = json.loads((folder / "meta.json").read_text())
+    return {"meta": meta, "categorizer": lgb.Booster(model_file=str(folder / categorizer.MODEL_FILE)),
+            "risk": lgb.Booster(model_file=str(folder / risk.MODEL_FILE)), "isolation": joblib.load(folder / risk.ISO_FILE)}
+
+
+def score_table(table, models):
+    meta = models["meta"]
+    predicted, confidence = categorizer.predict_table(models["categorizer"], table)
+    prob = models["risk"].predict(table[RISK_FEATURES])
+    anomaly = risk.isolation_scores(models["isolation"], meta["risk"]["iso_scale"], table)
+    return table.assign(
         predicted=[CATEGORIES[i] for i in predicted], confidence=confidence,
         confident=confidence >= meta["categorizer"]["threshold"], prob=prob, anomaly=anomaly,
         high=(prob >= meta["risk"]["threshold"]) | (anomaly >= meta["risk"]["iso_threshold"]))
-    scored = table.set_index("txn_id")[["is_new_cp", "cp_age_days", "cp_count", "in_cp_amount", "amt_ratio_type", "confident", "high"]].to_dict("index")
 
-    bill_events = pd.read_csv(DATA / "bill_events.csv", parse_dates=["due_date", "paid_ts"])
+
+def load_bill_events(folder=DATA):
+    bill_events = pd.read_csv(Path(folder) / "bill_events.csv", parse_dates=["due_date", "paid_ts"])
     bill_events["due_date"] = bill_events["due_date"].dt.date
-    bill_events = bill_events[bill_events["due_date"] >= TEST_START]
+    return bill_events[bill_events["due_date"] >= TEST_START]
 
+
+def run(txns, table, bill_events):
+    scored = table.set_index("txn_id")[SCORED].to_dict("index")
     decisions, nudges, flags, detected = replay(txns.sort_values("ts"), scored, bill_events)
     test = table.merge(decisions, on="txn_id")
     test["amount"] = test["amount"].astype(float)
+    return test, nudges, flags, detected
+
+
+def main():
+    models = load_models()
+    meta = models["meta"]
+    txns = load_transactions(DATA / "transactions.csv")
+    table = score_table(build_table(txns), models)
+    test, nudges, flags, detected = run(txns, table, load_bill_events())
     customers = txns["customer_id"].nunique()
     personas = txns.drop_duplicates("customer_id").set_index("customer_id")["persona"]
 
@@ -204,12 +234,15 @@ def main():
 
     metrics = {
         "test_month": str(TEST_START)[:7], "customers": int(customers), "labels": labels, "guard": guard,
+        "friction": friction(test),
         "guard_by_scam_type": by_type, "guard_by_persona": by_persona,
         "unusual_legit_paused_share": rate((unusual.decision.eq("pause") & (unusual.behaviour | unusual.rules)).sum(), len(unusual)),
         "bills": bills, "nudges": nudge, "thresholds": {"risk": meta["risk"]["threshold"],
         "isolation": meta["risk"]["iso_threshold"], "label_confidence": meta["categorizer"]["threshold"]},
     }
     (MODELS / "metrics.json").write_text(json.dumps(metrics, indent=2))
+    EVIDENCE.mkdir(parents=True, exist_ok=True)
+    (EVIDENCE / "metrics.json").write_text(json.dumps(metrics, indent=2))
     DOCS.mkdir(exist_ok=True)
     (DOCS / "evaluation.md").write_text(report(metrics))
     print(report(metrics))
@@ -220,7 +253,7 @@ def pct(value):
 
 
 def report(m):
-    g, l, b, n = m["guard"], m["labels"], m["bills"], m["nudges"]
+    g, l, b, n, f = m["guard"], m["labels"], m["bills"], m["nudges"], m["friction"]
     lines = [
         "# Evaluation on the held-out month",
         "",
@@ -252,6 +285,14 @@ def report(m):
     lines += [f"| {k} | {pct(v['recall_payments'])} | {v['false_pauses_per_customer_month']} | {v['all_pauses_per_customer_month']} |"
               for k, v in m["guard_by_persona"].items()]
     lines += [
+        "", "## Customer experience (alert fatigue)", "", "| Metric | Value |", "|---|---|",
+        f"| Outgoing payments in the test month | {f['payments']} |",
+        f"| Went straight to OTP with no question and no message | {pct(f['no_interruption'])} |",
+        f"| Silent decisions | {pct(f['silent'])} |",
+        f"| Nudges (one line, payment continues) | {pct(f['nudge'])} |",
+        f"| Pauses (full screen, customer still decides) | {pct(f['pause'])} |",
+        f"| Genuine payments that were paused | {pct(f['legit_paused'])} |",
+        f"| Asked \"what is this payment for?\" | {pct(f['asked_purpose'])} |",
         "", "## Labels", "", "| Metric | Value |", "|---|---|",
         f"| Category accuracy | {pct(l['accuracy'])} |",
         f"| Auto-labelled with confidence | {pct(l['auto_label_share'])} |",

@@ -36,6 +36,18 @@ All data is synthetic. Scam attempts are oversampled, so precision would be lowe
 | shop_owner | 85.7% | 0.6667 | 1.4333 |
 | student | 100.0% | 0.64 | 0.86 |
 
+## Customer experience (alert fatigue)
+
+| Metric | Value |
+|---|---|
+| Outgoing payments in the test month | 9178 |
+| Went straight to OTP with no question and no message | 91.0% |
+| Silent decisions | 92.2% |
+| Nudges (one line, payment continues) | 5.3% |
+| Pauses (full screen, customer still decides) | 2.5% |
+| Genuine payments that were paused | 1.9% |
+| Asked "what is this payment for?" | 2.7% |
+
 ## Labels
 
 | Metric | Value |
